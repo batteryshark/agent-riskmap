@@ -54,6 +54,47 @@ export interface CalleeClassification {
   readonly summary: string;
 }
 
+/** A parsed `content`-surface signature (regex → atom over raw text). */
+export interface ContentSignature {
+  readonly id: string;
+  readonly atom: string;
+  readonly regex: RegExp;
+  readonly confidence: number;
+  readonly summary: string;
+  readonly capPerFile: number | null;
+  readonly mechanic: boolean;
+  readonly contextRegex: RegExp | null;
+  readonly order: number;
+}
+
+/** Map pack `regex_flags` names to JS RegExp flag letters. */
+function reFlagLetters(spec: unknown): string {
+  const map: Record<string, string> = { ignore_case: "i", multiline: "m", dotall: "s" };
+  const out = new Set<string>();
+  if (Array.isArray(spec)) for (const f of spec) { const m = map[String(f)]; if (m) out.add(m); }
+  return [...out].join("");
+}
+
+/**
+ * Compile a Python-authored pattern as a JS RegExp. Handles leading inline flag
+ * groups (`(?im)…` — valid in Python, not JS) by hoisting them to JS flags, and
+ * returns null when the pattern uses syntax JS can't express (skipped, not fatal).
+ */
+export function compilePattern(src: string, flagSpec: unknown, extra = ""): RegExp | null {
+  let pattern = src;
+  let flags = reFlagLetters(flagSpec) + extra;
+  const lead = pattern.match(/^\(\?([imsxau]+)\)/);
+  if (lead) {
+    for (const c of lead[1]!) if ("ims".includes(c) && !flags.includes(c)) flags += c;
+    pattern = pattern.slice(lead[0].length);
+  }
+  try {
+    return new RegExp(pattern, [...new Set(flags)].join(""));
+  } catch {
+    return null;
+  }
+}
+
 export class SignaturePackError extends Error {
   constructor(message: string) {
     super(message);
@@ -105,6 +146,7 @@ export class SignaturePack {
     readonly path: string,
     readonly rules: readonly SignatureRule[],
     readonly observationGates: readonly ObservationGate[],
+    readonly contentSignatures: readonly ContentSignature[] = [],
   ) {}
 
   /** First matching `callee`-surface rule for `lang`, highest priority first. */
@@ -112,6 +154,17 @@ export class SignaturePack {
     for (const rule of this.rulesFor(lang)) {
       if (rule.surface === "callee" && matches(callee, rule)) {
         return { atom: rule.atom, confidence: rule.confidence, summary: rule.summary };
+      }
+    }
+    return null;
+  }
+
+  /** Match an engine-normalized binary import symbol to (atom, summary), pack order. */
+  classifyImport(symbol: string): { atom: string; summary: string } | null {
+    for (const rule of this.rules) {
+      if (rule.surface !== "binary-import") continue;
+      if (rule.values.some((v) => symbol.includes(v))) {
+        return { atom: rule.atom, summary: rule.summary };
       }
     }
     return null;
@@ -189,9 +242,9 @@ function parsePack(data: Record<string, unknown>, path: string): SignaturePack {
   const signatures = (data.signatures as Array<Record<string, unknown>>) ?? [];
   signatures.forEach((row, i) => {
     const surface = String(row.surface);
-    // Parse the known surfaces; other surfaces are reserved for later. Only
-    // `callee` participates in classifyCallee (mirrors the Python parser).
-    if (surface !== "callee" && surface !== "content") return;
+    // `callee` + `binary-import` are `match`-based rules. `content` is regex-based
+    // and parsed separately below.
+    if (surface !== "callee" && surface !== "binary-import") return;
     const match = (row.match as Record<string, unknown>) ?? {};
     try {
       rules.push({
@@ -213,6 +266,30 @@ function parsePack(data: Record<string, unknown>, path: string): SignaturePack {
         `invalid signature in ${path} at signatures[${i}]: ${(e as Error).message}`,
       );
     }
+  });
+
+  const contentSignatures: ContentSignature[] = [];
+  signatures.forEach((row, i) => {
+    if (String(row.surface) !== "content") return;
+    const regex = compilePattern(String(row.regex), row.regex_flags, "g");
+    if (regex === null) return; // JS-incompatible pattern — skipped, not fatal
+    const ctx = (row.requires_context as Record<string, unknown>) ?? {};
+    const anyRegex = ctx.any_regex as unknown[] | undefined;
+    const contextRegex =
+      anyRegex && anyRegex.length
+        ? compilePattern(anyRegex.map(String).join("|"), ctx.regex_flags)
+        : null;
+    contentSignatures.push({
+      id: String(row.id),
+      atom: String(row.atom),
+      regex,
+      confidence: Number(row.confidence),
+      summary: String(row.summary),
+      capPerFile: row.cap_per_file != null ? Number(row.cap_per_file) : null,
+      mechanic: Boolean(row.mechanic ?? false),
+      contextRegex,
+      order: i,
+    });
   });
 
   const gates: ObservationGate[] = [];
@@ -240,8 +317,8 @@ function parsePack(data: Record<string, unknown>, path: string): SignaturePack {
     }
   });
 
-  if (!rules.some((r) => r.surface === "callee")) {
-    throw new SignaturePackError(`invalid signature pack ${path}: no callee signatures found`);
+  if (rules.length === 0 && contentSignatures.length === 0) {
+    throw new SignaturePackError(`invalid signature pack ${path}: no usable signatures found`);
   }
-  return new SignaturePack(String(data.id), String(data.version), path, rules, gates);
+  return new SignaturePack(String(data.id), String(data.version), path, rules, gates, contentSignatures);
 }

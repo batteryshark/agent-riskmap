@@ -1,0 +1,28 @@
+{
+  "name": "@stonefish-labs/agent-risk",
+  "version": "0.0.1",
+  "description": "What can my agent be tricked into, and what does it become once it holds these tools? Scans a directory of agent tools/skills/MCP servers for dangerous capability compositions (EXFIL/RCE/DROP) and posture.",
+  "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": { "agent-risk": "./dist/cli.js" },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@stonefish-labs/scan-core": "workspace:*",
+    "@stonefish-labs/rules": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.23.0",
+    "typescript": "^5.6.0"
+  },
+  "license": "Apache-2.0",
+  "author": "batteryshark",
+  "publishConfig": { "access": "public" }
+}

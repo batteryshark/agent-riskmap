@@ -18,7 +18,7 @@
  *   12  items remain but none actionable → deadlocked, needs human
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -91,7 +91,13 @@ export function loadState(cwd: string = process.cwd()): LedgerState | null {
 export function saveState(state: LedgerState, cwd: string = process.cwd()): void {
   const dir = join(cwd, LEDGER_DIR);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(cwd, STATE_FILE), JSON.stringify(state, null, 2));
+  // Durable write: serialize to a temp file, then atomically rename over the
+  // target. A crash mid-write leaves the previous state.json intact rather than a
+  // truncated/corrupt file — important for long-running loops.
+  const target = join(cwd, STATE_FILE);
+  const tmp = `${target}.tmp-${process.pid}`;
+  writeFileSync(tmp, JSON.stringify(state, null, 2));
+  renameSync(tmp, target);
 }
 
 export function clearLedger(cwd: string = process.cwd()): boolean {
