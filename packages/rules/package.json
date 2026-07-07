@@ -1,0 +1,27 @@
+{
+  "name": "@stonefish-labs/rules",
+  "version": "0.0.1",
+  "description": "Vendored parallax-taxonomy detection data (signature packs + reference tables) so Stonefish Labs tools are self-contained — no taxonomy checkout required.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./data/*": "./data/*"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist", "data"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "license": "Apache-2.0",
+  "author": "batteryshark",
+  "publishConfig": { "access": "public" }
+}

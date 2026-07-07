@@ -1,0 +1,98 @@
+[
+  {
+    "atom": "ARTF.CRYPTO_ADDR",
+    "confidence": 0.7,
+    "summary": "cryptocurrency address literal",
+    "matched_text": "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+    "rule_id": "regex.ARTF.CRYPTO_ADDR",
+    "start_line": 8
+  },
+  {
+    "atom": "ARTF.CRYPTO_ADDR",
+    "confidence": 0.7,
+    "summary": "cryptocurrency address literal",
+    "matched_text": "0x52908400098527886E0F7030069857D2E4169EE7",
+    "rule_id": "regex.ARTF.CRYPTO_ADDR",
+    "start_line": 9
+  },
+  {
+    "atom": "ARTF.EMAIL",
+    "confidence": 0.4,
+    "summary": "hardcoded email address",
+    "matched_text": "attacker@evil.example",
+    "rule_id": "regex.ARTF.EMAIL",
+    "start_line": 7
+  },
+  {
+    "atom": "ARTF.HASH",
+    "confidence": 0.35,
+    "summary": "hash / digest literal: e3b0c44298fc1c14...",
+    "matched_text": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rule_id": "regex.ARTF.HASH",
+    "start_line": 10
+  },
+  {
+    "atom": "ARTF.IP",
+    "confidence": 0.4,
+    "summary": "hardcoded IP address",
+    "matched_text": "10.11.12.13",
+    "rule_id": "regex.ARTF.IP",
+    "start_line": 3
+  },
+  {
+    "atom": "ARTF.IP",
+    "confidence": 0.4,
+    "summary": "hardcoded IP address",
+    "matched_text": "203.0.113.7",
+    "rule_id": "regex.ARTF.IP",
+    "start_line": 5
+  },
+  {
+    "atom": "ARTF.TIMESTAMP",
+    "confidence": 0.3,
+    "summary": "fixed timestamp literal: 2021-07-04T12:00:00Z",
+    "matched_text": "2021-07-04T12:00:00Z",
+    "rule_id": "regex.ARTF.TIMESTAMP",
+    "start_line": 11
+  },
+  {
+    "atom": "ARTF.URL",
+    "confidence": 0.7,
+    "summary": "embedded URL literal",
+    "matched_text": "https://c2.evil.example/beacon",
+    "rule_id": "regex.ARTF.URL",
+    "start_line": 1
+  },
+  {
+    "atom": "CRED.CLOUD",
+    "confidence": 0.65,
+    "summary": "reference to a credential file path: .aws/credentials",
+    "matched_text": ".aws/credentials",
+    "rule_id": "regex.CRED.CLOUD",
+    "start_line": 4
+  },
+  {
+    "atom": "FSYS.SENSITIVE",
+    "confidence": 0.55,
+    "summary": "access to a sensitive location: /.aws/",
+    "matched_text": "/.aws/",
+    "rule_id": "regex.FSYS.SENSITIVE",
+    "start_line": 4
+  },
+  {
+    "atom": "NETW.FTP",
+    "confidence": 0.7,
+    "summary": "FTP URL literal",
+    "matched_text": "ftp://drop.example.net/loot",
+    "rule_id": "regex.NETW.FTP",
+    "start_line": 2
+  },
+  {
+    "atom": "NETW.SOCKET",
+    "confidence": 0.6,
+    "summary": "SSH/SFTP URL literal",
+    "matched_text": "ssh://root@10.11.12.13/",
+    "rule_id": "regex.NETW.SOCKET",
+    "start_line": 3
+  }
+]
