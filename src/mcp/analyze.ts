@@ -94,6 +94,9 @@ export interface McpFindings {
   tools: ToolVerdict[];
   poison: Array<{ where: string; hit: string }>;
   externalHosts: string[];
+  /** What the server tried to do to the client during the probe. */
+  observed: { sampling: number; elicitation: number; rootsRequested: number };
+  presentedHeaders: string[];
   volatile: boolean;
   complete: boolean;
   notes: string[];
@@ -139,6 +142,16 @@ export function analyzeManifest(m: ServerManifest): { findings: McpFindings; hin
   for (const p of m.prompts) for (const h of poisonHits(p.description)) { poison.push({ where: `prompt:${p.name}`, hit: h }); push("delegated-trust", "trust:poisoning", h, "poison", `prompt:${p.name}`); push("steerability", undefined, h, "poison"); }
   for (const b of m.resourceBodies) { noteHosts(b.text); for (const h of poisonHits(b.text)) { poison.push({ where: `resource:${b.uri}`, hit: h }); push("delegated-trust", "trust:poisoning", h, "poison", `resource:${b.uri}`); push("steerability", undefined, h, "poison"); } }
 
+  // Observed client-capability abuse: the server drove YOUR inference / user during
+  // the probe. Sampling = the server can make your agent think/act on its behalf.
+  for (const s of m.observed.sampling) push("delegated-trust", "trust:sampling", `requested sampling: ${s.intent}`, "sampling");
+  if (m.observed.sampling.length) {
+    push("latent", undefined, "server can drive your inference (MCP sampling)", "sampling");
+    push("steerability", undefined, "server-authored prompts fed to your model", "sampling");
+  }
+  for (const e of m.observed.elicitation) push("delegated-trust", "trust:elicitation", `prompted your user: ${e.message}`, "elicitation");
+  if (m.observed.elicitation.length) push("authority", undefined, "server can prompt your user (MCP elicitation)", "elicitation");
+
   for (const h of hosts) push("reach", "reach:egress", `external host ${h}`, "external-host");
 
   const findings: McpFindings = {
@@ -159,6 +172,8 @@ export function analyzeManifest(m: ServerManifest): { findings: McpFindings; hin
     tools: verdicts,
     poison,
     externalHosts: [...hosts].sort(),
+    observed: { sampling: m.observed.sampling.length, elicitation: m.observed.elicitation.length, rootsRequested: m.observed.rootsRequested },
+    presentedHeaders: m.presentedHeaders,
     volatile,
     complete: m.completeness.complete,
     notes: m.completeness.notes,

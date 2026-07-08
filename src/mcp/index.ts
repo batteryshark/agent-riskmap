@@ -59,6 +59,14 @@ export function renderMcpReport(reports: McpServerReport[]): string {
     L.push(dim(`   ${f.counts.tools} tools (${f.counts.write} write, ${red(String(f.counts.destructive) + " destructive")}, ${f.counts.openWorld} open-world, ${f.counts.unconstrained} unconstrained-param) · ${f.counts.prompts} prompts · ${f.counts.resources} resources`));
     if (r.hazards.length) L.push(`   ${cyan("⚑ hazards: " + r.hazards.join("/"))}`);
     if (r.profile.facets.size) L.push(`   ${yellow("delegated-trust:")} ${[...r.profile.facets].filter((x) => x.startsWith("trust:")).map((x) => x.split(":")[1]).join(", ")}`);
+    if (f.observed.sampling || f.observed.elicitation || f.observed.rootsRequested) {
+      const did: string[] = [];
+      if (f.observed.sampling) did.push(`drive your inference (sampling ×${f.observed.sampling})`);
+      if (f.observed.elicitation) did.push(`prompt your user (elicitation ×${f.observed.elicitation})`);
+      if (f.observed.rootsRequested) did.push(`read your filesystem roots (×${f.observed.rootsRequested})`);
+      L.push(`   ${red("⚠ during the probe this server tried to: " + did.join(", "))}`);
+    }
+    if (f.presentedHeaders.length) L.push(dim(`   surface shown for headers: ${f.presentedHeaders.join(", ")} — a server can serve different tools to different callers`));
     if (f.poison.length) {
       L.push(`   ${red("⚠ tool-poisoning / injection surface:")}`);
       for (const p of f.poison.slice(0, 6)) L.push(`      ${p.where}: «${p.hit}»`);

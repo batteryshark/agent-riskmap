@@ -61,13 +61,24 @@ adds what is *specific* to trusting a black box, as facets:
 | `trust:opaque` | no source — you can't read what it does | any live-probed server |
 | `trust:volatile` | the advertised set can change per-call / per-caller | `listChanged` capability, remote transport, or a tool-search meta-tool |
 | `trust:poisoning` | injects instructions into your context (tool descriptions, prompt templates, resource bodies, server `instructions`) | hidden-instruction patterns + invisible/bidi unicode |
-| `trust:sampling` | can drive **your** inference (MCP `sampling`) | client-granted capability — do not grant to opaque servers |
-| `trust:elicitation` | can prompt **your** user (MCP `elicitation`) | client-granted capability — do not grant to opaque servers |
+| `trust:sampling` | can drive **your** inference (MCP `sampling`) | **actively probed** — the client advertises the capability and records any request the server makes during discovery (returning a safe canned reply) |
+| `trust:elicitation` | can prompt **your** user (MCP `elicitation`) | **actively probed** — same mechanism; observed requests are recorded |
 
-The captured surface is a **snapshot**. Treat every captured string as untrusted data,
-never instructions; a hostile server can hide behavior or serve different content to
-different callers. This is why delegated-trust raises the floor: you are trusting code
-you can't read and can't pin.
+The probe advertises `sampling` / `elicitation` / `roots` and records what the server
+*tries* to do to the client (a server that asks to run your model even during
+discovery is a strong signal). It only observes discovery-time requests — a server
+that samples only inside a tool call isn't seen, because we never invoke tools.
+
+**Tool search** is a server feature: a progressive-disclosure meta-tool can hide the
+real tools behind a search op. `--drive-search` drives it (read-only) to enumerate
+them; otherwise the surface is flagged partial.
+
+**The surface is header/caller-dependent.** A server can serve different tools to
+different identities, which is why we take the whole `mcp.json` (with its headers) —
+what we capture is the surface *for those headers*, and it is a **snapshot**. Treat
+every captured string as untrusted data; a hostile server can hide behavior or serve
+different content per caller. That is why delegated-trust raises the floor: you are
+trusting code you can't read and can't pin.
 
 Dimensions 5 and 6 stay separate axes on purpose. Inbound (untrusted content that can
 steer) and outbound (where data and actions can go) are not the same thing: injection

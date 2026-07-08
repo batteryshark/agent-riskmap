@@ -68,11 +68,22 @@ export interface ServerManifest {
   resources: McpResource[];
   resourceTemplates: McpResourceTemplate[];
   resourceBodies: Array<{ uri: string; mimeType?: string; text: string; truncated: boolean }>;
+  /** What the server tried to do to US during the probe (client-capability abuse). */
+  observed: {
+    sampling: Array<{ intent: string }>; // server asked to run YOUR model (what it wanted, scrubbed)
+    elicitation: Array<{ message: string }>; // server asked to prompt YOUR user
+    rootsRequested: number; // server asked for your filesystem roots
+  };
+  /** The headers/identity presented — the surface can differ per caller. */
+  presentedHeaders: string[];
   completeness: { complete: boolean; notes: string[] };
 }
 
 export interface ProbeOptions {
   readResources?: boolean;
+  /** Drive a detected tool-search / meta-tool to enumerate hidden tools (read-only
+   * discovery, but it DOES call the search tool — hence opt-in). */
+  driveSearch?: boolean;
   maxResources?: number;
   maxResourceBytes?: number;
   maxItems?: number;
@@ -122,19 +133,49 @@ export function makeScrubber(secrets: string[] = []): (v: unknown) => string {
 
 async function loadSdk(): Promise<any> {
   try {
-    const [{ Client }, { StdioClientTransport }, { StreamableHTTPClientTransport }, { SSEClientTransport }] =
+    const [{ Client }, { StdioClientTransport }, { StreamableHTTPClientTransport }, { SSEClientTransport }, types] =
       await Promise.all([
         import("@modelcontextprotocol/sdk/client/index.js"),
         import("@modelcontextprotocol/sdk/client/stdio.js"),
         import("@modelcontextprotocol/sdk/client/streamableHttp.js"),
         import("@modelcontextprotocol/sdk/client/sse.js"),
+        import("@modelcontextprotocol/sdk/types.js"),
       ]);
-    return { Client, StdioClientTransport, StreamableHTTPClientTransport, SSEClientTransport };
+    return { Client, StdioClientTransport, StreamableHTTPClientTransport, SSEClientTransport, types };
   } catch {
     throw new Error(
       "live MCP probing needs the optional peer '@modelcontextprotocol/sdk' — install it: npm i @modelcontextprotocol/sdk",
     );
   }
+}
+
+/** Best-effort drive of a tool-search meta-tool to reveal hidden tools (read-only). */
+async function driveMetaTool(client: any, metaName: string, scrub: (v: unknown) => string, cap: number): Promise<McpTool[]> {
+  const argShapes = [{}, { query: "" }, { q: "" }, { query: "*" }, { search: "" }];
+  for (const args of argShapes) {
+    try {
+      const res = await client.callTool({ name: metaName, arguments: args });
+      const found = extractToolDefs(res);
+      if (found.length) return found.slice(0, cap).map((t) => scrubTool(t, `meta-tool:${metaName}`, scrub));
+    } catch { /* try next shape */ }
+  }
+  return [];
+}
+
+/** Pull tool-like objects ({name, description/inputSchema}) from a tool-call result. */
+function extractToolDefs(res: any): any[] {
+  const out: any[] = [];
+  const consider = (v: any) => { if (v && typeof v === "object" && typeof v.name === "string" && ("description" in v || "inputSchema" in v || "input_schema" in v)) out.push(v); };
+  const walk = (v: any, depth = 0) => {
+    if (depth > 4 || v == null) return;
+    if (Array.isArray(v)) { for (const x of v) walk(x, depth + 1); return; }
+    if (typeof v === "object") { consider(v); for (const x of Object.values(v)) walk(x, depth + 1); }
+  };
+  walk(res?.structuredContent);
+  for (const c of res?.content ?? []) {
+    if (c?.type === "text" && typeof c.text === "string") { try { walk(JSON.parse(c.text)); } catch { /* not json */ } }
+  }
+  return out;
 }
 
 function transportKind(cfg: McpServerConfig): McpTransportKind {
@@ -175,7 +216,10 @@ export async function probeServer(id: string, cfg: McpServerConfig, opts: ProbeO
   const manifest: ServerManifest = {
     id, transport: kind, endpoint, connected: false,
     capabilities: {}, tools: [], prompts: [], resources: [], resourceTemplates: [],
-    resourceBodies: [], completeness: { complete: true, notes: [] },
+    resourceBodies: [],
+    observed: { sampling: [], elicitation: [], rootsRequested: 0 },
+    presentedHeaders: Object.keys(cfg.headers ?? {}),
+    completeness: { complete: true, notes: [] },
   };
 
   const sdk = await loadSdk();
@@ -195,7 +239,30 @@ export async function probeServer(id: string, cfg: McpServerConfig, opts: ProbeO
   const origSet = typeof transport.setProtocolVersion === "function" ? transport.setProtocolVersion.bind(transport) : undefined;
   transport.setProtocolVersion = (v: string) => { negotiatedProtocol = v; origSet?.(v); };
 
-  const client = new sdk.Client({ name: "agent-riskmap", version: "0" }, { capabilities: {} });
+  // Advertise the client capabilities a server could abuse (sampling / elicitation /
+  // roots) and RECORD any request the server makes during the read-only probe —
+  // returning a safe canned reply so no real inference / user prompt is exposed.
+  const client = new sdk.Client(
+    { name: "agent-riskmap", version: "0" },
+    { capabilities: { sampling: {}, elicitation: {}, roots: { listChanged: true } } },
+  );
+  try {
+    client.setRequestHandler(sdk.types.CreateMessageRequestSchema, async (req: any) => {
+      const msgs = req.params?.messages ?? [];
+      const intent = scrub([req.params?.systemPrompt, ...msgs.map((m: any) => (typeof m?.content?.text === "string" ? m.content.text : JSON.stringify(m?.content)))].filter(Boolean).join(" | ")).slice(0, 300);
+      manifest.observed.sampling.push({ intent });
+      return { role: "assistant", content: { type: "text", text: "[declined: agent-riskmap probe does not run inference for servers]" }, model: "agent-riskmap-probe", stopReason: "endTurn" };
+    });
+    client.setRequestHandler(sdk.types.ElicitRequestSchema, async (req: any) => {
+      manifest.observed.elicitation.push({ message: scrub(req.params?.message ?? "").slice(0, 200) });
+      return { action: "decline" };
+    });
+    client.setRequestHandler(sdk.types.ListRootsRequestSchema, async () => {
+      manifest.observed.rootsRequested++;
+      return { roots: [] };
+    });
+  } catch { /* schemas unavailable on older SDKs — probe still works without capture */ }
+
   try {
     await client.connect(transport);
   } catch (e) {
@@ -219,14 +286,26 @@ export async function probeServer(id: string, cfg: McpServerConfig, opts: ProbeO
       }, o.maxItems);
       manifest.tools = raw.map((t: any) => scrubTool(t, "tools/list", scrub));
 
-      // progressive-disclosure meta-tool: flag it (we do NOT drive it — driving
-      // means invoking a tool). Record incompleteness honestly.
+      // Progressive-disclosure / tool-search meta-tool: a server FEATURE (not a client
+      // convention) that hides the real tools behind a search op. We flag it, and —
+      // when driveSearch is set — drive it (read-only discovery) to reveal them.
       const meta = raw.find((t: any) => META_TOOL_HINTS.some((re) => re.test(t.name)));
-      if (meta || caps.tools?.listChanged) {
+      if (meta && opts.driveSearch) {
+        const hidden = await driveMetaTool(client, meta.name, scrub, o.maxItems);
+        if (hidden.length) {
+          const seen = new Set(manifest.tools.map((t) => t.name));
+          const fresh = hidden.filter((t) => !seen.has(t.name));
+          manifest.tools.push(...fresh);
+          manifest.completeness.notes.push(`drove tool-search meta-tool "${meta.name}" → ${fresh.length} additional tool(s) revealed`);
+        } else {
+          manifest.completeness.complete = false;
+          manifest.completeness.notes.push(`tool-search meta-tool "${meta.name}" could not be enumerated — surface is partial`);
+        }
+      } else if (meta) {
         manifest.completeness.complete = false;
-        if (meta) manifest.completeness.notes.push(`a tool-search / meta-tool ("${meta.name}") may hide additional tools not in tools/list`);
-        if (caps.tools?.listChanged) manifest.completeness.notes.push("server advertises tools.listChanged — the tool set can change at runtime");
+        manifest.completeness.notes.push(`a tool-search / meta-tool ("${meta.name}") may hide tools not in tools/list — re-run with --drive-search to enumerate`);
       }
+      if (caps.tools?.listChanged) manifest.completeness.notes.push("server advertises tools.listChanged — the tool set can change at runtime");
     }
     if (caps.prompts) {
       const raw = await collectPaged(async (cursor) => {

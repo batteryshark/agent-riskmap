@@ -358,6 +358,25 @@ export function sweep(root: string): string[] {
     .map((t) => t.path);
 }
 
+/** Config files under `root` that declare `mcpServers` — the servers to live-probe. */
+export function findMcpConfigFiles(root: string): string[] {
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    for (const name of safeReaddir(dir)) {
+      if (SKIP_DIRS.has(name)) continue;
+      const p = join(dir, name);
+      if (isDir(p)) {
+        if (!name.startsWith(".") || AGENT_DOTDIRS.has(name)) walk(p);
+      } else if (CONFIG_FILES.has(name)) {
+        const cfg = tryJson(p);
+        if (cfg && typeof cfg === "object" && (cfg as Record<string, unknown>).mcpServers) out.push(p);
+      }
+    }
+  };
+  walk(root);
+  return out;
+}
+
 const scanner = loadScanner(rulesDataRoot());
 
 function record(

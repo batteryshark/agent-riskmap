@@ -5,7 +5,7 @@
  * hazards, and says what to restrict / prune / gate. --json emits the full report.
  */
 
-import { workflow } from "./product.js";
+import { workflow, scanSurface } from "./product.js";
 import { renderHtml } from "./html.js";
 import { mergeVerdicts } from "./triage.js";
 import { loadState, loadStateFile } from "./ledger.js";
@@ -17,15 +17,16 @@ import type { TargetKind } from "./scan.js";
 async function runMcp(args: string[]): Promise<number> {
   const json = args.includes("--json");
   const readResources = args.includes("--read-resources");
+  const driveSearch = args.includes("--drive-search");
   const seIdx = args.indexOf("--secrets-env");
   const secretsEnv = seIdx !== -1 ? args[seIdx + 1] : undefined;
   const config = args.find((a, i) => !a.startsWith("--") && a !== "mcp" && args[i - 1] !== "--secrets-env");
   if (!config) {
-    console.error("usage: agent-riskmap mcp <mcp-config.json> [--read-resources] [--secrets-env <file>] [--json]");
+    console.error("usage: agent-riskmap mcp <mcp-config.json> [--read-resources] [--drive-search] [--secrets-env <file>] [--json]");
     return 1;
   }
-  console.error(`\x1b[2mconnecting to MCP server(s) in ${config}${readResources ? " (reading resource bodies)" : ""} — this launches/contacts each server, never invokes tools…\x1b[0m`);
-  const reports = await scanMcpConfig(config, { secretsEnv, readResources });
+  console.error(`\x1b[2mconnecting to MCP server(s) in ${config}${readResources ? " (reading resource bodies)" : ""}${driveSearch ? " (driving tool-search)" : ""} — this launches/contacts each server${driveSearch ? " and calls its read-only search tool" : ", never invokes tools"}…\x1b[0m`);
+  const reports = await scanMcpConfig(config, { secretsEnv, readResources, driveSearch });
   if (json) {
     console.log(JSON.stringify(reports.map((r) => ({ ...r.findings, tier: r.posture.tier, hazards: r.hazards, manifest: r.manifest })), null, 2));
     return 0;
@@ -36,20 +37,25 @@ async function runMcp(args: string[]): Promise<number> {
 
 const KIND_LABEL: Record<TargetKind, string> = { skill: "skills", mcp: "mcp", tool: "tools", hooks: "hooks", prompt: "prompts" };
 
-function main(argv: string[]): number {
+async function main(argv: string[]): Promise<number> {
   const args = argv.slice(2);
   const json = args.includes("--json");
   const html = args.includes("--html");
+  const connect = args.includes("--connect");
+  const seIdx = args.indexOf("--secrets-env");
   const ledgerIdx = args.indexOf("--ledger");
   const useLedger = ledgerIdx !== -1;
   const ledgerPathArg = useLedger && args[ledgerIdx + 1] && !args[ledgerIdx + 1]!.startsWith("--") ? args[ledgerIdx + 1] : undefined;
-  const dir = args.find((a) => !a.startsWith("--") && a !== ledgerPathArg);
+  const dir = args.find((a, i) => !a.startsWith("--") && a !== ledgerPathArg && args[i - 1] !== "--secrets-env");
   if (!dir) {
-    console.error("usage: agent-riskmap <dir> [--json] [--html] [--ledger [state.json]]");
+    console.error("usage: agent-riskmap <dir> [--connect] [--read-resources] [--drive-search] [--json] [--html] [--ledger [state.json]]");
     return 1;
   }
 
-  let report = workflow(dir);
+  if (connect) console.error("\x1b[2m--connect: live-probing MCP servers declared in this surface's configs (connects to them)…\x1b[0m");
+  let report = connect
+    ? await scanSurface(dir, { connect: true, readResources: args.includes("--read-resources"), driveSearch: args.includes("--drive-search"), secretsEnv: seIdx !== -1 ? args[seIdx + 1] : undefined })
+    : workflow(dir);
 
   // Merge triage verdicts when asked, so --html renders the reviewed picture.
   if (useLedger) {
@@ -125,11 +131,8 @@ function main(argv: string[]): number {
   return 0;
 }
 
-if (process.argv[2] === "mcp") {
-  runMcp(process.argv.slice(2)).then(
-    (code) => process.exit(code),
-    (e) => { console.error(`mcp: ${e instanceof Error ? e.message : String(e)}`); process.exit(1); },
-  );
-} else {
-  process.exit(main(process.argv));
-}
+const entry = process.argv[2] === "mcp" ? runMcp(process.argv.slice(2)) : main(process.argv);
+entry.then(
+  (code) => process.exit(code),
+  (e) => { console.error(`${e instanceof Error ? e.message : String(e)}`); process.exit(1); },
+);

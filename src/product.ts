@@ -78,21 +78,15 @@ function recommend(hazards: HazardResult[], kindOf: Map<string, TargetKind>): Ag
   return recs;
 }
 
-export function workflow(dir: string): AgentRiskReport {
-  const root = resolve(dir);
-  const found = discover(root);
-  const scans: TargetScan[] = found.map((t) => scanTarget(root, t));
-
-  const profiles: DimensionProfile[] = scans.map((s) =>
-    buildProfile(s.target, s.kind, s.atoms, s.evidence, s.dimHints, s.description),
-  );
-  const kindOf = new Map<string, TargetKind>(scans.map((s) => [s.target, s.kind]));
-
+/** Assemble a full report from a set of dimension profiles (static skills and/or
+ * live-probed MCP servers). Profiles carry their kind, so this is source-agnostic. */
+export function assembleReport(profiles: DimensionProfile[]): AgentRiskReport {
+  const kindOf = new Map<string, TargetKind>(profiles.map((p) => [p.target, p.kind]));
   const hazards = analyzeHazards(profiles);
   const posture = surfacePosture(profiles);
 
   const surface = Object.fromEntries(KINDS.map((k) => [k, 0])) as Record<TargetKind, number>;
-  for (const s of scans) surface[s.kind]++;
+  for (const p of profiles) surface[p.kind]++;
 
   const POWER: Dimension[] = ["authority", "data", "latent", "reach", "persistence"];
   const summary = {
@@ -120,13 +114,13 @@ export function workflow(dir: string): AgentRiskReport {
     product: PRODUCT,
     question: QUESTION,
     headline,
-    toolCount: found.length,
+    toolCount: profiles.length,
     surface,
     summary,
     posture,
     hazards,
     overview: {
-      counts: { targets: found.length, selfSufficientTargets: selfSufficientTargets.length, crossSkillPairings },
+      counts: { targets: profiles.length, selfSufficientTargets: selfSufficientTargets.length, crossSkillPairings },
       selfSufficientTargets,
       crossSkillCompositions: hazards
         .filter((h) => h.crossPairs > 0)
@@ -149,4 +143,47 @@ export function workflow(dir: string): AgentRiskReport {
       };
     }),
   };
+}
+
+/** Static scan of a directory surface (skills / tools / hooks / prompts / MCP refs). */
+export function workflow(dir: string): AgentRiskReport {
+  const root = resolve(dir);
+  const found = discover(root);
+  const scans: TargetScan[] = found.map((t) => scanTarget(root, t));
+  const profiles: DimensionProfile[] = scans.map((s) =>
+    buildProfile(s.target, s.kind, s.atoms, s.evidence, s.dimHints, s.description),
+  );
+  return assembleReport(profiles);
+}
+
+/**
+ * Full surface scan: the static pass, plus (when `connect`) live introspection of
+ * every MCP server declared in the surface's configs — the opaque servers fold in
+ * as delegated-trust targets alongside the skills. Async + side-effecting (it
+ * connects to servers), so it's opt-in and separate from the pure `workflow`.
+ */
+export async function scanSurface(
+  dir: string,
+  opts: { connect?: boolean; readResources?: boolean; driveSearch?: boolean; secretsEnv?: string } = {},
+): Promise<AgentRiskReport> {
+  const root = resolve(dir);
+  const found = discover(root);
+  const scans = found.map((t) => scanTarget(root, t));
+  // Static profiles, minus the shallow "mcp ref" targets we're about to probe live.
+  const staticProfiles = scans
+    .filter((s) => !(opts.connect && s.kind === "mcp"))
+    .map((s) => buildProfile(s.target, s.kind, s.atoms, s.evidence, s.dimHints, s.description));
+
+  if (!opts.connect) return assembleReport(staticProfiles);
+
+  const { findMcpConfigFiles } = await import("./scan.js");
+  const { scanMcpConfig } = await import("./mcp/index.js");
+  const live: DimensionProfile[] = [];
+  for (const cfgPath of findMcpConfigFiles(root)) {
+    try {
+      const reports = await scanMcpConfig(cfgPath, { secretsEnv: opts.secretsEnv, readResources: opts.readResources, driveSearch: opts.driveSearch });
+      for (const r of reports) live.push(r.profile);
+    } catch { /* a config that can't be probed is skipped; static targets remain */ }
+  }
+  return assembleReport([...staticProfiles, ...live]);
 }
