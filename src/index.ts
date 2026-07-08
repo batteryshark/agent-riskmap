@@ -10,3 +10,8 @@ export {
 export { tierOfProfile, surfacePosture, type Posture, type Tier } from "./severity.js";
 export { descriptionGap, DIM_PLAIN, FACET_PLAIN, HAZARD_PLAIN, MULTIPLIER_PLAIN } from "./plain.js";
 export { mergeVerdicts } from "./triage.js";
+export {
+  scanMcpConfig, renderMcpReport, probeServer, loadMcpConfig,
+  analyzeManifest, profileFromManifest, classifyTool, poisonHits,
+  type ServerManifest, type McpFindings, type McpServerReport,
+} from "./mcp/index.js";

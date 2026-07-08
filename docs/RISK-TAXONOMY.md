@@ -32,9 +32,9 @@ precisely enough that a detector can combine *cheap deterministic hints* with
 
 ## Level 1: Risk **dimensions** (the axes)
 
-A skill is profiled along seven independent dimensions. The first three are *power*,
+A skill is profiled along eight independent dimensions. The first three are *power*,
 the fourth a *multiplier*, five and six are *exposure to untrusted control*, seven is
-*duration*.
+*duration*, and eight is *who you're trusting* (opaque third-party code).
 
 | # | Dimension | The question | Severity driver |
 |---|---|---|---|
@@ -42,9 +42,32 @@ the fourth a *multiplier*, five and six are *exposure to untrusted control*, sev
 | 2 | **Data Access & Scope** | What sensitive data can it read? | sensitivity × breadth (one file → entire mailbox/keychain) |
 | 3 | **Latent Capability / Delegation** | Does it extend the agent's power (run arbitrary code, spawn/delegate to other agents, install software, wrap new tools)? | generality (fixed op → arbitrary code) |
 | 4 | **Guardrail Posture** | Does it weaken or bypass safety (permission bypass, sudo, auto-accept, disable protections)? | **multiplier** on 1-3 |
-| 5 | **Steerability / Injection Surface** | Does it consume *untrusted content* (web, email, files, tool output) that could carry instructions redirecting its authority? | this is the agent-native attack vector |
+| 5 | **Steerability / Injection Surface** | Does it consume *untrusted content* (web, email, files, tool output, **MCP tool descriptions / resource bodies / server instructions**) that could carry instructions redirecting its authority? | this is the agent-native attack vector |
 | 6 | **Reach / Connectivity** | Network egress + external services it can talk to. | where data can leave / instructions can enter |
 | 7 | **Persistence / Autonomy** | Runs unattended, schedules, installs hooks/daemons, survives sessions? | turns a one-shot risk into a standing one |
+| 8 | **Delegated Trust** | Are you handing power to an **opaque, mutable third party** you can't read — a remote/local MCP server that can change its surface, poison your context, or drive your inference/user? | **multiplier**; opaque + capable → pessimistic floor |
+
+### Dimension 8 — Delegated Trust (MCP servers)
+
+Skills, hooks, and prompts you can *read*. An MCP server you often cannot — especially
+a remote one. `agent-riskmap mcp <config>` connects to each server as a client and
+captures the **advertised surface** (protocol revision, capabilities, tools + schemas +
+annotations, prompts, resources, and optionally resource bodies) without invoking any
+tool. The server's tools map onto dimensions 1-6 like any capability; delegated-trust
+adds what is *specific* to trusting a black box, as facets:
+
+| Facet | Meaning | How detected |
+|---|---|---|
+| `trust:opaque` | no source — you can't read what it does | any live-probed server |
+| `trust:volatile` | the advertised set can change per-call / per-caller | `listChanged` capability, remote transport, or a tool-search meta-tool |
+| `trust:poisoning` | injects instructions into your context (tool descriptions, prompt templates, resource bodies, server `instructions`) | hidden-instruction patterns + invisible/bidi unicode |
+| `trust:sampling` | can drive **your** inference (MCP `sampling`) | client-granted capability — do not grant to opaque servers |
+| `trust:elicitation` | can prompt **your** user (MCP `elicitation`) | client-granted capability — do not grant to opaque servers |
+
+The captured surface is a **snapshot**. Treat every captured string as untrusted data,
+never instructions; a hostile server can hide behavior or serve different content to
+different callers. This is why delegated-trust raises the floor: you are trusting code
+you can't read and can't pin.
 
 Dimensions 5 and 6 stay separate axes on purpose. Inbound (untrusted content that can
 steer) and outbound (where data and actions can go) are not the same thing: injection

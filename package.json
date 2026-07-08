@@ -1,18 +1,36 @@
 {
   "name": "@stonefish-labs/agent-riskmap",
   "version": "0.0.1",
-  "description": "Point it at an agent surface (skills, MCP servers, hooks, prompts, extensions); it maps which capability combinations could lead to exfil or other hazards (EXFIL/RCE/DROP), the overall posture, and what to restrict / prune / gate behind HITL.",
+  "description": "Point it at an agent surface (skills, MCP servers, hooks, prompts, extensions); it profiles each along eight risk dimensions, composes the agent-native hazards, and says what to restrict / prune / gate. Includes live introspection of remote/opaque MCP servers you have no source for.",
   "type": "module",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./ledger": { "types": "./dist/ledger.d.ts", "import": "./dist/ledger.js" },
-    "./triage": { "types": "./dist/triage.d.ts", "import": "./dist/triage.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./ledger": {
+      "types": "./dist/ledger.d.ts",
+      "import": "./dist/ledger.js"
+    },
+    "./triage": {
+      "types": "./dist/triage.d.ts",
+      "import": "./dist/triage.js"
+    }
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "agent-riskmap": "./dist/cli.js", "riskmap": "./dist/cli.js" },
-  "files": ["dist", "data", "extensions"],
-  "engines": { "node": ">=20" },
+  "bin": {
+    "agent-riskmap": "./dist/cli.js",
+    "riskmap": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "data",
+    "extensions"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "packageManager": "pnpm@11.9.0",
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.json",
@@ -41,6 +59,14 @@
   },
   "license": "Apache-2.0",
   "author": "batteryshark",
-  "repository": { "type": "git", "url": "git+https://github.com/batteryshark/agent-riskmap.git" },
-  "publishConfig": { "access": "public" }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/batteryshark/agent-riskmap.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "optionalDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  }
 }

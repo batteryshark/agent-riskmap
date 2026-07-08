@@ -9,8 +9,30 @@ import { workflow } from "./product.js";
 import { renderHtml } from "./html.js";
 import { mergeVerdicts } from "./triage.js";
 import { loadState, loadStateFile } from "./ledger.js";
+import { scanMcpConfig, renderMcpReport } from "./mcp/index.js";
 import { resolve } from "node:path";
 import type { TargetKind } from "./scan.js";
+
+/** `agent-riskmap mcp <config.json>` — live-probe MCP servers (connects to them). */
+async function runMcp(args: string[]): Promise<number> {
+  const json = args.includes("--json");
+  const readResources = args.includes("--read-resources");
+  const seIdx = args.indexOf("--secrets-env");
+  const secretsEnv = seIdx !== -1 ? args[seIdx + 1] : undefined;
+  const config = args.find((a, i) => !a.startsWith("--") && a !== "mcp" && args[i - 1] !== "--secrets-env");
+  if (!config) {
+    console.error("usage: agent-riskmap mcp <mcp-config.json> [--read-resources] [--secrets-env <file>] [--json]");
+    return 1;
+  }
+  console.error(`\x1b[2mconnecting to MCP server(s) in ${config}${readResources ? " (reading resource bodies)" : ""} — this launches/contacts each server, never invokes tools…\x1b[0m`);
+  const reports = await scanMcpConfig(config, { secretsEnv, readResources });
+  if (json) {
+    console.log(JSON.stringify(reports.map((r) => ({ ...r.findings, tier: r.posture.tier, hazards: r.hazards, manifest: r.manifest })), null, 2));
+    return 0;
+  }
+  console.log(renderMcpReport(reports));
+  return 0;
+}
 
 const KIND_LABEL: Record<TargetKind, string> = { skill: "skills", mcp: "mcp", tool: "tools", hooks: "hooks", prompt: "prompts" };
 
@@ -103,4 +125,11 @@ function main(argv: string[]): number {
   return 0;
 }
 
-process.exit(main(process.argv));
+if (process.argv[2] === "mcp") {
+  runMcp(process.argv.slice(2)).then(
+    (code) => process.exit(code),
+    (e) => { console.error(`mcp: ${e instanceof Error ? e.message : String(e)}`); process.exit(1); },
+  );
+} else {
+  process.exit(main(process.argv));
+}

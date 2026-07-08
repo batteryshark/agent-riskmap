@@ -34,7 +34,9 @@ export interface Posture {
  * about API keys) is medium — a mention is not an access.
  */
 function blastOf(p: DimensionProfile): { label: Posture["blast"]; rank: number } {
-  const strong = new Set(p.hints.filter((h) => h.source === "atom").map((h) => h.dimension));
+  // Strong = real evidence: code atoms OR a live MCP server's advertised tools.
+  // Prose pattern mentions are weaker (a mention is not an access).
+  const strong = new Set(p.hints.filter((h) => h.source === "atom" || h.source === "mcp").map((h) => h.dimension));
   if (HIGH_POWER.some((d) => strong.has(d))) return { label: "high", rank: 3 };
   if (HIGH_POWER.some((d) => p.dims.has(d))) return { label: "medium", rank: 2 }; // mention only
   if (MED_POWER.some((d) => p.dims.has(d))) return { label: "medium", rank: 2 };
@@ -60,6 +62,12 @@ export function tierOfProfile(p: DimensionProfile): Posture {
   }
   if (has(p, "persistence") && rank >= 2) {
     multipliers.push("persistence");
+    score += 1;
+  }
+  // ⑧ delegated-trust: an opaque, mutable third party you can't pin amplifies
+  // everything — you're trusting code you can't read and that can change under you.
+  if (has(p, "delegated-trust") && rank >= 2) {
+    multipliers.push("delegated-trust");
     score += 1;
   }
   score = Math.max(0, Math.min(4, score));

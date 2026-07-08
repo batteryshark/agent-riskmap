@@ -18,10 +18,11 @@ export type Dimension =
   | "guardrail" // ④ weakens or bypasses safety (a multiplier)
   | "steerability" // ⑤ consumes untrusted content that can steer it (injection surface)
   | "reach" //     ⑥ network egress / external services
-  | "persistence"; // ⑦ runs unattended / schedules / survives sessions
+  | "persistence" // ⑦ runs unattended / schedules / survives sessions
+  | "delegated-trust"; // ⑧ opaque, mutable third party you don't control (MCP servers)
 
 export const DIMENSIONS: Dimension[] = [
-  "authority", "data", "latent", "guardrail", "steerability", "reach", "persistence",
+  "authority", "data", "latent", "guardrail", "steerability", "reach", "persistence", "delegated-trust",
 ];
 
 /** Facets that hazard composition needs to distinguish within a dimension. */
@@ -29,12 +30,17 @@ export type Facet =
   | "authority:outbound" // send / post / share / publish — Unauthorized Communication
   | "authority:destructive" // delete / overwrite / revoke — Destructive Action
   | "reach:egress"
-  | "data:sensitive";
+  | "data:sensitive"
+  | "trust:opaque" //      no source — a black box you can't read
+  | "trust:volatile" //    the advertised surface can change per-call / per-caller
+  | "trust:poisoning" //   injects instructions into your context (tool descs / bodies / instructions)
+  | "trust:sampling" //    can drive YOUR inference (MCP sampling)
+  | "trust:elicitation"; // can prompt YOUR user (MCP elicitation)
 
 export interface DimHint {
   dimension: Dimension;
   facet?: Facet;
-  source: "atom" | "pattern";
+  source: "atom" | "pattern" | "mcp"; // mcp = observed live from a server's advertised surface (strong, like an atom)
   detail: string; // atom id or pattern label
   evidence: string; // matched token / phrase
   path?: string;

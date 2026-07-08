@@ -19,6 +19,7 @@ export const DIM_PLAIN: Record<Dimension, string> = {
   steerability: "read outside content that could carry hidden instructions",
   reach: "talk to the network",
   persistence: "run unattended or survive across sessions",
+  "delegated-trust": "hand power to an opaque third party you can't read and that can change under you",
 };
 
 export const FACET_PLAIN: Record<Facet, string> = {
@@ -26,6 +27,11 @@ export const FACET_PLAIN: Record<Facet, string> = {
   "authority:destructive": "delete or overwrite things",
   "reach:egress": "send data off your machine",
   "data:sensitive": "read sensitive data like passwords, keys, and tokens",
+  "trust:opaque": "run code you can't see the source of",
+  "trust:volatile": "change its tools or behavior at any time",
+  "trust:poisoning": "feed hidden instructions into your agent's context",
+  "trust:sampling": "borrow your agent's model to run its own prompts",
+  "trust:elicitation": "pop prompts to your user through your agent",
 };
 
 /** A plain abuse sentence for a self-sufficient hazard. */
@@ -38,10 +44,11 @@ export const HAZARD_PLAIN: Record<HazardId, string> = {
   PERSIST: "It can run code and it runs unattended, so it keeps operating on its own across sessions.",
 };
 
-export const MULTIPLIER_PLAIN: Record<"guardrail" | "steerability" | "persistence", string> = {
+export const MULTIPLIER_PLAIN: Record<"guardrail" | "steerability" | "persistence" | "delegated-trust", string> = {
   guardrail: "bypasses permission or safety prompts",
   steerability: "reads outside content that could contain hidden instructions",
   persistence: "runs unattended, across sessions",
+  "delegated-trust": "hands power to an opaque third party that can change under you",
 };
 
 /**
