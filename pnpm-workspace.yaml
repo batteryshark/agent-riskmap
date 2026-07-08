@@ -1,9 +1,6 @@
-packages:
-  - "packages/*"
-
+# Single-package repo (not a workspace). This file carries pnpm settings only:
+# tsx → esbuild ships a prebuilt native binary via an install script.
 allowBuilds:
   esbuild: true
-
-# tsx → esbuild ships a prebuilt native binary via an install script.
 onlyBuiltDependencies:
   - esbuild

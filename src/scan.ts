@@ -18,8 +18,8 @@
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
-import { loadScanner } from "@stonefish-labs/scan-core";
-import { rulesDataRoot } from "@stonefish-labs/rules";
+import { loadScanner } from "./scanner/index.js";
+import { rulesDataRoot } from "./rules.js";
 
 // Structural markers: their presence makes a directory one target and stops the
 // walk from recursing past it (one skill pack = one target, not one per file).

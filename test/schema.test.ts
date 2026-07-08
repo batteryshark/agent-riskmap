@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import Ajv2020 from "ajv/dist/2020.js";
 
-import { resolveSourceCalleePack, taxonomyRoot } from "../src/index.js";
+import { resolveSourceCalleePack, taxonomyRoot } from "../src/scanner/index.js";
 
 test("real pack validates against the taxonomy JSON schema", () => {
   const root = taxonomyRoot();

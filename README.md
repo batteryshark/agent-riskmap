@@ -1,42 +1,100 @@
-# Stonefish Labs
+# @stonefish-labs/agent-riskmap
 
-Lightweight, dependency-free security tooling you can drop into your coding agent
-— **[pi](https://pi.dev)** and **[opencode](https://opencode.ai)** — to try two
-capabilities without a heavy runtime:
+**Point it at an agent surface. Map what your tools could be tricked into.**
 
-- **agent-risk** — what can my agent be tricked into, and what does it become once
-  it holds these tools? (dangerous capability compositions: EXFIL / RCE / DROP)
-- **mcd** — is this code doing something malicious, and can I prove it?
-  (Malicious Code Detection)
+Agents accrete power one skill at a time. Each tool looks reasonable alone — but a
+credential reader plus a network sender is an exfiltration path, and nobody decided
+to build that; it *emerged* from co-enabling two safe-looking things. `agent-riskmap`
+scans an agent surface and maps the dangerous **capability combinations**, the
+overall **posture**, and what to **restrict / prune / gate behind HITL**.
 
-A stonefish is venomous prey camouflaged as a harmless rock. So is the risk these
-tools look for: the thing that reads benign until you look closely.
+No graphs, no decompiler, no LLM required for the scan itself — a fast, deterministic
+pass over the same detection data the [parallax](https://github.com/batteryshark/parallax)
+engine uses, reimplemented in pure TypeScript.
 
-## Design
+## Install
 
-Pure TypeScript. No Python, no external services. The scanner reads the **same**
-`parallax-signature-pack/v1` rule packs the upstream Parallax engine reads (from
-the [`parallax-taxonomy`](../parallax-taxonomy) repo), so detection knowledge is
-single-sourced, not forked.
-
-```
-@stonefish-labs/scan-core     shared primitives: signature-pack reader/matcher,
-                              tree-sitter walkers (WIP), binary triage (WIP)
-@stonefish-labs/agent-risk    readings + npx CLI            (WIP)
-@stonefish-labs/mcd           readings + npx CLI            (WIP)
-@stonefish-labs/*-pi          pi extension per product      (WIP)
-@stonefish-labs/*-opencode    opencode tool per product     (WIP)
+```sh
+npm i -g @stonefish-labs/agent-riskmap   # or: npx @stonefish-labs/agent-riskmap <dir>
 ```
 
-## Development
+## Use
 
-```bash
-pnpm install
-pnpm -r build
-pnpm -r test
+```sh
+agent-riskmap ~/.claude          # your whole config surface   (short alias: riskmap)
+agent-riskmap ~/.claude/plugins  # installed plugins/skills
+agent-riskmap ./my-skill         # a single skill/tool
+agent-riskmap <dir> --json       # full machine-readable report
 ```
 
-Point the scanner at a taxonomy checkout with `PRLX_TAXONOMY_ROOT`, or keep
-`parallax-taxonomy` as a sibling directory (auto-resolved).
+## What it looks at — the agent surface
+
+Each discovered element is tagged with a **kind**:
+
+| kind | what it is | found via |
+|---|---|---|
+| **skill** | a skill pack | `SKILL.md` |
+| **tool** | a code tool / extension | `package.json`, `pyproject.toml`, … |
+| **mcp** | an MCP server | `server.json`, or a `mcpServers` reference in `settings.json` / `.mcp.json` |
+| **hooks** | inline shell that **auto-runs** on agent events | a `hooks` block in a settings file |
+| **prompt** | instruction surface that can steer the agent | `CLAUDE.md`, `AGENTS.md`, `commands/` & `agents/` `.md` |
+
+Point it at a project and it finds the tool *and* descends into a bundled `.claude/`
+surface. Big data subdirs (transcripts, `node_modules`) are skipped.
+
+## What it flags — dangerous compositions
+
+Every capability rolls up to a family (`NET · BROWSER · EXEC · LOAD · CRED · FSWRITE
+· INSTALL · AITM`). Three abuse compositions are each a `source → sink`:
+
+| composition | source | sink | meaning |
+|---|---|---|---|
+| **EXFIL** | `CRED` | `NET / BROWSER` | read secrets, then send them off-host |
+| **RCE** | `NET / BROWSER` | `EXEC / LOAD` | network input drives code execution |
+| **DROP** | `FSWRITE` | `EXEC / LOAD` | write a file, then execute it |
+
+A target is **self-sufficient** when it holds both halves alone. Two targets form a
+**cross-skill pairing** when one is source-only and the other sink-only — harmless
+apart, an abuse path the moment both are co-enabled in one agent. **Posture** = blast
+radius (capability severity) × steerability → `minimal / moderate / elevated / critical`.
+
+A **hook** that completes a path is worse than a tool the model must choose to call,
+because it runs on its own — so those are flagged `[prune]`, not just `[restrict]`.
+
+## Example
+
+```
+$ agent-riskmap ~/.claude/plugins
+
+surface: 23 skills · 4 mcp · 4 tools · 21 prompts
+
+4 targets complete an abuse path alone; 10 co-enable pairings.
+52 targets · 10 capable · 0 steerable · 42 inert
+posture: elevated — high blast radius; reachable capabilities: EXEC, FSWRITE, NET.
+
+▲ RCE  network input drives code execution
+    self-sufficient (completes it alone): …/discord, …/telegram, …/skill-creator
+    cross-skill (8 pairings):
+      source: …/build-mcp-server, …/mcp-integration, …
+      sink:   …/imessage, …/session-report
+
+what to do
+  [restrict] RCE: "…/discord" completes it alone — sandbox or gate behind HITL.
+  [gate]     RCE: keep [sources] and [sinks] in separate agents or review before both run.
+```
+
+## How it runs (the loop)
+
+The CLI is the deterministic half — *always complete*. For interactive triage, the
+same scan seeds a ledger that a harness model works item-by-item (confirm / dismiss /
+gate). See [LOOP.md](./LOOP.md).
+
+## Limits
+
+- Regex + shell-head detection, not full parsing — high recall, some coarse edges. It
+  finds *reachable capability*, not a proven exploit; treat findings as "gate/review,"
+  not "confirmed malicious."
+- Generic prompt-injection phrase detection isn't in yet, so prompt targets rarely
+  raise *steerability* on their own — see the note in [LOOP.md](./LOOP.md).
 
 Apache-2.0

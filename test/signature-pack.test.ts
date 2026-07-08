@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { SignaturePack, loadSourceCalleePack, type SignatureRule } from "../src/index.js";
+import { SignaturePack, loadSourceCalleePack, type SignatureRule } from "../src/scanner/index.js";
 
 function rule(
   p: Partial<SignatureRule> & Pick<SignatureRule, "atom" | "mode" | "values">,

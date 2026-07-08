@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { loadScanner, taxonomyRoot } from "../src/index.js";
+import { loadScanner, taxonomyRoot } from "../src/scanner/index.js";
 
 /** Shell command extraction is what makes hooks and .sh tools classify: bare
  * command words (`curl x`) have no `(`, so the `token(` path never sees them. */

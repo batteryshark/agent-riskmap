@@ -16,7 +16,7 @@ import {
   loadState,
   EXIT_CONTINUE,
   EXIT_COMPLETE,
-} from "../src/index.js";
+} from "../src/ledger.js";
 
 function tmp(): string {
   return mkdtempSync(join(tmpdir(), "sf-ledger-"));
