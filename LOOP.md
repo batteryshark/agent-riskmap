@@ -37,46 +37,44 @@ with no markers falls back to one target per child.
 
 → ledger: one `scan` item per target.
 
-## 2. Capability Map — *what can each element do?*
+## 2. Dimension profile — *what can each skill do, and be tricked into?*
 
-`scanTarget` reads a target's text — files for skill/tool/prompt targets, the
-command strings for hooks and MCP references — and produces **atoms** via scan-core:
-content-regex signatures over raw text (URLs, secrets, `curl … | sh`) plus callee
-classification on real code (`subprocess.run` → `EXEC.PROC`, `fetch` → `NETW.HTTP`,
-`fs.readFileSync('~/.aws/credentials')` → `CRED.*`) and on **shell command heads**
-(`curl` → `NETW.HTTP`, `rm` → `FSYS.DELETE`, `base64` → `XFRM.ENCODE`) — which is
-what makes a hook or a `.sh` tool classify at all. Atoms roll up to **capability
-families**: `NET · BROWSER · EXEC · LOAD · CRED · FSWRITE · INSTALL · AITM`. This is
-the always-complete substrate — the same detection data (the taxonomy packs) the
-Python engine uses, read by anything.
+`scanTarget` reads a target's text and produces two kinds of **hints**:
+*atoms* via scan-core (content signatures + callee classification on real code and
+shell command heads: `subprocess.run` → `EXEC.PROC`, `fetch` → `NETW.HTTP`,
+`fs.readFileSync('~/.aws/credentials')` → `CRED.*`) and *instruction patterns* —
+high-precision phrases matched over the prose (`--dangerously-skip-permissions`,
+"delegate to Claude Code", "your inbox"). Both roll up to the **seven risk
+dimensions** (see [RISK-TAXONOMY.md](./docs/RISK-TAXONOMY.md)): Action Authority ·
+Data Access · Latent Capability · Guardrail Posture · Steerability · Reach ·
+Persistence.
 
-> Steerability note: today the `AITM` family fires only on a specific
-> Unicode-confusable prompt-marker mechanic, so prompt targets are inventoried and
-> capability-scanned but rarely raise steerability on generic "ignore previous
-> instructions" prose. Generic prompt-injection phrase detection is the top planned
-> enrichment (it belongs in the shared signature pack, with FP care).
+Atoms are the *precise* signals; patterns are *hints* for the semantic-heavy
+dimensions atoms can't see (a markdown-only skill that describes delegating to an
+autonomous agent has no code atoms, but the pattern catches it). Both are a
+**pessimistic prior**, not a verdict.
 
-## 3. Classification — *what dangerous shapes exist?*
+## 3. Hazards & posture — *what dangerous shapes exist?*
 
-Three abuse compositions, each a `source → sink` over families:
+Dimensions compose into **six hazards**, each two roles A × B:
 
-| Composition | Source | Sink | Meaning |
-|---|---|---|---|
-| **EXFIL** | `CRED` | `NET / BROWSER` | read secrets, then send them off-host |
-| **RCE** | `NET / BROWSER` | `EXEC / LOAD` | network input drives code execution |
-| **DROP** | `FSWRITE` | `EXEC / LOAD` | write a file, then execute it |
+| Hazard | A × B | Meaning |
+|---|---|---|
+| **EXFIL** | data × reach | read sensitive data, send it off-host |
+| **COMMS** | outbound-authority × steerability | sends something you didn't intend |
+| **DESTROY** | destructive-authority × steerability | destroys something you didn't intend |
+| **GUARDRAIL** | latent × guardrail-bypass | runs code / delegates while bypassing safety |
+| **RCE** | steerability × latent | untrusted input drives code execution |
+| **PERSIST** | latent × persistence | standing autonomous capability |
 
-A target is **self-sufficient** when it holds both halves alone; two targets form a
-**cross-skill pairing** when one is source-only and the other sink-only —
-dangerous the moment both are co-enabled in one agent. **Posture** = blast radius
-(capability severity) × steerability (any `AITM` surface) → `minimal / moderate /
-elevated / critical`.
+A skill is **self-sufficient** when it fills both roles alone; two skills form a
+**cross-skill pairing** when one fills A-only and the other B-only. **Posture is
+pessimistic** — guardrail-bypass or autonomy on a capable skill defaults to
+`critical`; atom-backed capability is high blast, a prose *mention* only medium.
 
-→ ledger: one `review` item per self-sufficient target and per cross-skill
-**composition** (not per pairing — sources × sinks is combinatorial, but the
-adjudication is a single decision: "are these real, and should they be
-co-enabled?"), seeded with `state_label: new`. Deterministic findings are
-authoritative detections — the loop never re-runs detection or invents findings.
+→ ledger: **one `review` item per skill** (worst-tier first), seeded with its
+dimension profile as a `state_label: new` prior. Nothing is silently "inert" — the
+model reviews every skill; the deterministic pass never has the last word.
 
 ## 4. Triage — *is each finding real, and what do we do?*
 

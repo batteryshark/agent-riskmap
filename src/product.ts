@@ -1,28 +1,33 @@
 /**
- * agent-riskmap workflow: discover → scan → families → combos → posture → report.
+ * agent-riskmap workflow: discover → scan → profile → hazards → posture → report.
  *
- * Point it at an agent surface (skills, MCP tools, hooks, prompts, extensions);
- * it maps which capability combinations could lead to exfil or other hazards,
- * and what to restrict / prune / gate behind HITL.
+ * Point it at an agent surface; it profiles each skill along the seven risk
+ * dimensions (docs/RISK-TAXONOMY.md), composes them into the six agent-native
+ * hazards, assigns a pessimistic posture, and says what to restrict / prune / gate.
+ * The deterministic pass is a high-recall floor; the triage loop refines it.
  */
 
 import { resolve } from "node:path";
 import { discover, scanTarget, type TargetScan, type TargetKind } from "./scan.js";
-import { families, analyzeCombos, type Family, type TargetFamilies, type CompResult } from "./combos.js";
-import { buildPosture, type Posture } from "./posture.js";
+import {
+  buildProfile, DIMENSIONS,
+  type Dimension, type Facet, type DimensionProfile, type DimHint,
+} from "./dimensions.js";
+import { analyzeHazards, selfSufficientHazards, type HazardResult, type HazardId } from "./hazards.js";
+import { tierOfProfile, surfacePosture, type Posture, type Tier } from "./severity.js";
 
 export const PRODUCT = "agent-riskmap";
 export const QUESTION =
-  "What can my agent be tricked into, and what does it become once it holds these tools?";
+  "What can each of these skills be tricked into, and what does my agent become once it holds them?";
 
 export interface TargetReport {
   target: string;
   kind: TargetKind;
-  families: Family[];
-  atoms: Record<string, number>;
-  fileCount: number;
-  /** A few citations (capped) so triage can read where each capability was seen. */
-  evidence: Array<{ atom: string; path: string; line: number; evidence: string }>;
+  dimensions: Dimension[];
+  facets: Facet[];
+  hazards: HazardId[]; // self-sufficient for these
+  tier: Tier;
+  hints: DimHint[]; // capped, for triage evidence
 }
 
 export interface AgentRiskReport {
@@ -32,52 +37,39 @@ export interface AgentRiskReport {
   toolCount: number;
   surface: Record<TargetKind, number>;
   summary: { capable: number; steerable: number; inert: number };
+  posture: Posture;
+  hazards: HazardResult[];
   overview: {
     counts: { targets: number; selfSufficientTargets: number; crossSkillPairings: number };
     selfSufficientTargets: string[];
-    crossSkillCompositions: Array<{
-      id: string;
-      label: string;
-      sourceOnly: string[];
-      sinkOnly: string[];
-      pairings: number;
-    }>;
+    crossSkillCompositions: Array<{ id: HazardId; label: string; aName: string; bName: string; aOnly: string[]; bOnly: string[]; pairings: number }>;
   };
-  posture: Posture;
-  combos: CompResult[];
   recommendations: Array<{ action: "restrict" | "prune" | "gate" | "review" | "ok"; text: string }>;
   targets: TargetReport[];
 }
 
 const KINDS: TargetKind[] = ["skill", "mcp", "tool", "hooks", "prompt"];
 
-/** Hooks auto-run on agent events — a self-sufficient hook is worse than a tool
- * the model must choose to call. Prompts are steerable influence, not capability. */
-function recommend(
-  combos: CompResult[],
-  kindOf: Map<string, TargetKind>,
-): AgentRiskReport["recommendations"] {
+function recommend(hazards: HazardResult[], kindOf: Map<string, TargetKind>): AgentRiskReport["recommendations"] {
   const recs: AgentRiskReport["recommendations"] = [];
-  for (const c of combos) {
-    for (const t of c.selfSufficient) {
+  for (const h of hazards) {
+    for (const t of h.selfSufficient) {
       const auto = kindOf.get(t) === "hooks";
       recs.push({
         action: auto ? "prune" : "restrict",
         text: auto
-          ? `${c.id}: hook "${t}" completes "${c.label}" and runs automatically — prune it or pin its command; do not leave it enabled.`
-          : `${c.id}: "${t}" completes "${c.label}" alone — sandbox it or gate behind HITL before enabling.`,
+          ? `${h.id}: hook "${t}" ${h.label} and runs automatically — prune or pin it.`
+          : `${h.id}: "${t}" can ${h.label} alone — sandbox or gate behind HITL before enabling.`,
       });
     }
-    if (c.crossPairs > 0) {
+    if (h.crossPairs > 0) {
       recs.push({
         action: "gate",
-        text: `${c.id}: co-enabling any of [${c.sourceOnly.join(", ")}] with any of [${c.sinkOnly.join(", ")}] completes "${c.label}" — keep them in separate agents or require review before running both together.`,
+        text: `${h.id}: co-enabling any of [${h.aOnly.join(", ")}] (${h.aName}) with any of [${h.bOnly.join(", ")}] (${h.bName}) ${h.label} — keep them in separate agents or require review.`,
       });
     }
   }
-  if (recs.length === 0) {
-    recs.push({ action: "ok", text: "No EXFIL / RCE / DROP composition found; no gating required beyond baseline review." });
-  }
+  if (recs.length === 0) recs.push({ action: "ok", text: "No hazard composition found; no gating required beyond baseline review." });
   return recs;
 }
 
@@ -86,42 +78,38 @@ export function workflow(dir: string): AgentRiskReport {
   const found = discover(root);
   const scans: TargetScan[] = found.map((t) => scanTarget(root, t));
 
-  const tfs: TargetFamilies[] = scans.map((s) => ({
-    target: s.target,
-    fams: families(Object.keys(s.atoms)),
-  }));
+  const profiles: DimensionProfile[] = scans.map((s) =>
+    buildProfile(s.target, s.kind, s.atoms, s.evidence, s.dimHints),
+  );
   const kindOf = new Map<string, TargetKind>(scans.map((s) => [s.target, s.kind]));
 
-  const combos = analyzeCombos(tfs);
+  const hazards = analyzeHazards(profiles);
+  const posture = surfacePosture(profiles);
 
   const surface = Object.fromEntries(KINDS.map((k) => [k, 0])) as Record<TargetKind, number>;
   for (const s of scans) surface[s.kind]++;
 
-  const capFams = (f: Set<Family>) => [...f].some((x) => x !== "AITM");
+  const POWER: Dimension[] = ["authority", "data", "latent", "reach", "persistence"];
   const summary = {
-    capable: tfs.filter((t) => capFams(t.fams)).length,
-    steerable: tfs.filter((t) => t.fams.has("AITM")).length,
-    inert: tfs.filter((t) => t.fams.size === 0).length,
+    capable: profiles.filter((p) => POWER.some((d) => p.dims.has(d))).length,
+    steerable: profiles.filter((p) => p.dims.has("steerability")).length,
+    inert: profiles.filter((p) => p.dims.size === 0).length,
   };
 
-  const selfSuffSet = new Set<string>();
-  for (const c of combos) c.selfSufficient.forEach((t) => selfSuffSet.add(t));
-  const selfSufficientTargets = [...selfSuffSet].sort();
-  const crossSkillPairings = combos.reduce((n, c) => n + c.crossPairs, 0);
+  const selfSet = new Set<string>();
+  for (const h of hazards) h.selfSufficient.forEach((t) => selfSet.add(t));
+  const selfSufficientTargets = [...selfSet].sort();
+  const crossSkillPairings = hazards.reduce((n, h) => n + h.crossPairs, 0);
 
   let headline: string;
   if (selfSufficientTargets.length === 0 && crossSkillPairings === 0) {
-    headline = "No abuse-path combinations found across this surface.";
+    headline = "No hazard compositions found across this surface.";
   } else if (selfSufficientTargets.length > 0) {
     const n = selfSufficientTargets.length;
-    headline = `${n} target${n > 1 ? "s" : ""} complete an abuse path alone; ${crossSkillPairings} co-enable pairing${crossSkillPairings !== 1 ? "s" : ""}.`;
+    headline = `${n} skill${n > 1 ? "s" : ""} can complete a hazard alone; ${crossSkillPairings} co-enable pairing${crossSkillPairings !== 1 ? "s" : ""}.`;
   } else {
-    headline = `No single target completes an abuse path alone; ${crossSkillPairings} co-enable pairing${crossSkillPairings !== 1 ? "s" : ""} ${crossSkillPairings === 1 ? "does" : "do"}.`;
+    headline = `No single skill completes a hazard alone; ${crossSkillPairings} co-enable pairing${crossSkillPairings !== 1 ? "s" : ""} ${crossSkillPairings === 1 ? "does" : "do"}.`;
   }
-
-  const allFams = new Set<Family>();
-  for (const t of tfs) for (const f of t.fams) allFams.add(f);
-  const posture = buildPosture(allFams);
 
   return {
     product: PRODUCT,
@@ -130,27 +118,24 @@ export function workflow(dir: string): AgentRiskReport {
     toolCount: found.length,
     surface,
     summary,
-    overview: {
-      counts: {
-        targets: found.length,
-        selfSufficientTargets: selfSufficientTargets.length,
-        crossSkillPairings,
-      },
-      selfSufficientTargets,
-      crossSkillCompositions: combos
-        .filter((c) => c.crossPairs > 0)
-        .map((c) => ({ id: c.id, label: c.label, sourceOnly: c.sourceOnly, sinkOnly: c.sinkOnly, pairings: c.crossPairs })),
-    },
     posture,
-    combos,
-    recommendations: recommend(combos, kindOf),
-    targets: scans.map((s) => ({
-      target: s.target,
-      kind: s.kind,
-      families: [...families(Object.keys(s.atoms))].sort(),
-      atoms: s.atoms,
-      fileCount: s.fileCount,
-      evidence: s.evidence.slice(0, 8),
+    hazards,
+    overview: {
+      counts: { targets: found.length, selfSufficientTargets: selfSufficientTargets.length, crossSkillPairings },
+      selfSufficientTargets,
+      crossSkillCompositions: hazards
+        .filter((h) => h.crossPairs > 0)
+        .map((h) => ({ id: h.id, label: h.label, aName: h.aName, bName: h.bName, aOnly: h.aOnly, bOnly: h.bOnly, pairings: h.crossPairs })),
+    },
+    recommendations: recommend(hazards, kindOf),
+    targets: profiles.map((p) => ({
+      target: p.target,
+      kind: p.kind,
+      dimensions: DIMENSIONS.filter((d) => p.dims.has(d)),
+      facets: [...p.facets].sort(),
+      hazards: selfSufficientHazards(p),
+      tier: tierOfProfile(p).tier,
+      hints: p.hints.slice(0, 12),
     })),
   };
 }

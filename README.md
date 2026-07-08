@@ -42,45 +42,56 @@ Each discovered element is tagged with a **kind**:
 Point it at a project and it finds the tool *and* descends into a bundled `.claude/`
 surface. Big data subdirs (transcripts, `node_modules`) are skipped.
 
-## What it flags — dangerous compositions
+## What it flags — dimensions & hazards
 
-Every capability rolls up to a family (`NET · BROWSER · EXEC · LOAD · CRED · FSWRITE
-· INSTALL · AITM`). Three abuse compositions are each a `source → sink`:
+Each skill is profiled along **seven risk dimensions** (see
+[docs/RISK-TAXONOMY.md](./docs/RISK-TAXONOMY.md)):
 
-| composition | source | sink | meaning |
-|---|---|---|---|
-| **EXFIL** | `CRED` | `NET / BROWSER` | read secrets, then send them off-host |
-| **RCE** | `NET / BROWSER` | `EXEC / LOAD` | network input drives code execution |
-| **DROP** | `FSWRITE` | `EXEC / LOAD` | write a file, then execute it |
+> ① **Action Authority** (send / post / delete) · ② **Data Access & Scope** ·
+> ③ **Latent Capability / Delegation** (run code, spawn agents) · ④ **Guardrail
+> Posture** (bypass permissions) · ⑤ **Steerability / Injection** (consumes untrusted
+> input) · ⑥ **Reach** (egress) · ⑦ **Persistence / Autonomy**
 
-A target is **self-sufficient** when it holds both halves alone. Two targets form a
-**cross-skill pairing** when one is source-only and the other sink-only — harmless
-apart, an abuse path the moment both are co-enabled in one agent. **Posture** = blast
-radius (capability severity) × steerability → `minimal / moderate / elevated / critical`.
+Dimensions compose into **six hazards** — self-sufficient (one skill holds both
+parts) or a cross-skill pairing (two co-enabled skills each hold a part):
 
-A **hook** that completes a path is worse than a tool the model must choose to call,
-because it runs on its own — so those are flagged `[prune]`, not just `[restrict]`.
+| hazard | composition | meaning |
+|---|---|---|
+| **EXFIL** | data × reach | read sensitive data, send it off-host |
+| **COMMS** | outbound-authority × steerability | sends something you didn't intend |
+| **DESTROY** | destructive-authority × steerability | destroys something you didn't intend |
+| **GUARDRAIL** | latent × guardrail-bypass | runs code / delegates while bypassing safety |
+| **RCE** | untrusted-input × latent | untrusted input drives code execution |
+| **PERSIST** | latent × persistence | standing autonomous capability |
+
+**Posture is pessimistic** — "critical until proven otherwise": a guardrail bypass or
+autonomy on a capable skill defaults to `critical`; the review loop only downgrades on
+the record. Code atoms (real `subprocess`/credential reads) count as high blast; a mere
+*mention* of "API keys" in prose counts as medium — a mention is not an access. A
+**hook** that completes a hazard is worse than a tool the model must choose to call, so
+those are `[prune]`, not just `[restrict]`.
 
 ## Example
 
 ```
-$ agent-riskmap ~/.claude/plugins
+$ agent-riskmap ~/.hermes/skills
 
-surface: 23 skills · 4 mcp · 4 tools · 21 prompts
+surface: 74 skills
 
-4 targets complete an abuse path alone; 10 co-enable pairings.
-52 targets · 10 capable · 0 steerable · 42 inert
-posture: elevated — high blast radius; reachable capabilities: EXEC, FSWRITE, NET.
+10 skills can complete a hazard alone; 21 co-enable pairings.
+74 skills · 58 capable · 6 steerable · 15 no-signal
+posture: critical — high blast radius, guardrail multiplier; power: authority, data, latent.
 
-▲ RCE  network input drives code execution
-    self-sufficient (completes it alone): …/discord, …/telegram, …/skill-creator
-    cross-skill (8 pairings):
-      source: …/build-mcp-server, …/mcp-integration, …
-      sink:   …/imessage, …/session-report
+▲ GUARDRAIL  runs code / delegates while bypassing safety
+    self-sufficient: autonomous-ai-agents/claude-code, autonomous-ai-agents/codex, …
+
+riskiest skills
+  critical  autonomous-ai-agents/claude-code  authority, data, latent, guardrail, persistence  ⚑ GUARDRAIL/PERSIST
+  critical  apple/macos-computer-use          authority, data, latent, steerability            ⚑ DESTROY/RCE
+  critical  productivity/google-workspace     authority, data, reach, steerability             ⚑ EXFIL/COMMS
 
 what to do
-  [restrict] RCE: "…/discord" completes it alone — sandbox or gate behind HITL.
-  [gate]     RCE: keep [sources] and [sinks] in separate agents or review before both run.
+  [restrict] GUARDRAIL: "…/claude-code" can run code / delegate while bypassing safety alone — sandbox or gate behind HITL.
 ```
 
 ## How it runs (the loop)

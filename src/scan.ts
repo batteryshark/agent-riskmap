@@ -20,6 +20,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 import { loadScanner } from "./scanner/index.js";
 import { rulesDataRoot } from "./rules.js";
+import { scanDimensionPatterns, type DimHint } from "./dimensions.js";
 
 // Structural markers: their presence makes a directory one target and stops the
 // walk from recursing past it (one skill pack = one target, not one per file).
@@ -81,6 +82,8 @@ export interface TargetScan {
   atoms: Record<string, number>;
   fileCount: number;
   evidence: Array<{ atom: string; path: string; line: number; evidence: string }>;
+  /** Instruction-pattern dimension hints (the semantic-heavy dimensions). */
+  dimHints: DimHint[];
 }
 
 function safeReaddir(dir: string): string[] {
@@ -314,6 +317,7 @@ const scanner = loadScanner(rulesDataRoot());
 function record(
   atoms: Record<string, number>,
   evidence: TargetScan["evidence"],
+  dimHints: DimHint[],
   text: string,
   lang: string,
   path: string,
@@ -324,18 +328,22 @@ function record(
       evidence.push({ atom: o.atom, path, line: o.line, evidence: o.evidence });
     }
   }
+  // Instruction-pattern hints run on ALL text (incl. markdown) — that is the whole
+  // point: catch capability the skill *describes* but doesn't express as code.
+  if (dimHints.length < 400) dimHints.push(...scanDimensionPatterns(text, path));
 }
 
-/** Scan one target → aggregated atoms + evidence. */
+/** Scan one target → aggregated atoms + evidence + dimension hints. */
 export function scanTarget(root: string, target: Target): TargetScan {
   const atoms: Record<string, number> = {};
   const evidence: TargetScan["evidence"] = [];
+  const dimHints: DimHint[] = [];
   let fileCount = 0;
 
   if (target.synthetic) {
     for (const s of target.synthetic) {
       fileCount++;
-      record(atoms, evidence, s.text, s.lang, `${target.path} (${s.source})`);
+      record(atoms, evidence, dimHints, s.text, s.lang, `${target.path} (${s.source})`);
     }
   }
 
@@ -356,7 +364,7 @@ export function scanTarget(root: string, target: Target): TargetScan {
       return;
     }
     fileCount++;
-    record(atoms, evidence, text, LANG_BY_EXT[ext] ?? "*", relative(root, abs));
+    record(atoms, evidence, dimHints, text, LANG_BY_EXT[ext] ?? "*", relative(root, abs));
   };
 
   if (target.files) for (const f of target.files) scanFile(f);
@@ -373,5 +381,5 @@ export function scanTarget(root: string, target: Target): TargetScan {
     walk(target.dir);
   }
 
-  return { target: target.path, kind: target.kind, atoms, fileCount, evidence };
+  return { target: target.path, kind: target.kind, atoms, fileCount, evidence, dimHints };
 }

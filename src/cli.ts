@@ -1,16 +1,14 @@
 #!/usr/bin/env node
 /**
  * agent-riskmap CLI:  agent-riskmap <dir> [--json]   (short alias: riskmap)
- * Point it at an agent surface; it maps the hazardous capability combinations
- * and what to restrict / prune / gate. --json emits the full report.
+ * Profiles an agent surface along the seven risk dimensions, composes the six
+ * hazards, and says what to restrict / prune / gate. --json emits the full report.
  */
 
 import { workflow } from "./product.js";
 import type { TargetKind } from "./scan.js";
 
-const KIND_LABEL: Record<TargetKind, string> = {
-  skill: "skills", mcp: "mcp", tool: "tools", hooks: "hooks", prompt: "prompts",
-};
+const KIND_LABEL: Record<TargetKind, string> = { skill: "skills", mcp: "mcp", tool: "tools", hooks: "hooks", prompt: "prompts" };
 
 function main(argv: string[]): number {
   const args = argv.slice(2);
@@ -32,6 +30,7 @@ function main(argv: string[]): number {
   const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
   const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
   const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
+  const tierColor = (t: string) => (t === "critical" ? red(t) : t === "elevated" ? yellow(t) : dim(t));
 
   console.log(bold("agent-riskmap") + dim(`  —  ${report.question}`));
 
@@ -42,27 +41,35 @@ function main(argv: string[]): number {
   console.log(dim(`\nsurface: ${surface || "nothing recognized"}`));
 
   console.log(`\n${bold(report.headline)}`);
-  console.log(
-    dim(
-      `${report.toolCount} targets · ${report.summary.capable} capable · ${report.summary.steerable} steerable · ${report.summary.inert} inert`,
-    ),
-  );
-  console.log(`posture: ${bold(report.posture.tier)} — ${report.posture.headline}\n`);
+  console.log(dim(`${report.toolCount} skills · ${report.summary.capable} capable · ${report.summary.steerable} steerable · ${report.summary.inert} no-signal`));
+  console.log(`posture: ${tierColor(report.posture.tier)} — ${report.posture.headline}\n`);
 
-  for (const c of report.combos) {
-    if (c.selfSufficient.length === 0 && c.crossPairs === 0) continue;
-    console.log(`${red("▲ " + c.id)}  ${dim(c.label)}`);
-    if (c.selfSufficient.length) {
-      console.log(`    ${yellow("self-sufficient")} (completes it alone): ${c.selfSufficient.join(", ")}`);
-    }
-    if (c.crossPairs > 0) {
-      console.log(`    ${yellow("cross-skill")} (${c.crossPairs} pairing${c.crossPairs !== 1 ? "s" : ""}):`);
-      console.log(`      source: ${c.sourceOnly.join(", ")}`);
-      console.log(`      sink:   ${c.sinkOnly.join(", ")}`);
+  // Hazards with any composition.
+  for (const h of report.hazards) {
+    if (h.selfSufficient.length === 0 && h.crossPairs === 0) continue;
+    console.log(`${red("▲ " + h.id)}  ${dim(h.label)}`);
+    if (h.selfSufficient.length) console.log(`    ${yellow("self-sufficient")}: ${h.selfSufficient.join(", ")}`);
+    if (h.crossPairs > 0) {
+      console.log(`    ${yellow("cross-skill")} (${h.crossPairs} pairing${h.crossPairs !== 1 ? "s" : ""}):`);
+      console.log(`      ${h.aName}: ${h.aOnly.join(", ")}`);
+      console.log(`      ${h.bName}: ${h.bOnly.join(", ")}`);
     }
   }
   if (report.overview.counts.selfSufficientTargets === 0 && report.overview.counts.crossSkillPairings === 0) {
-    console.log(dim("No EXFIL / RCE / DROP compositions found."));
+    console.log(dim("No hazard compositions found."));
+  }
+
+  // The riskiest skills by tier (the map).
+  const rank = (t: string) => (t === "critical" ? 0 : t === "elevated" ? 1 : 2);
+  const risky = report.targets
+    .filter((t) => t.tier === "critical" || t.tier === "elevated")
+    .sort((a, b) => rank(a.tier) - rank(b.tier) || a.target.localeCompare(b.target));
+  if (risky.length) {
+    console.log(`\n${bold("riskiest skills")}`);
+    for (const t of risky.slice(0, 15)) {
+      console.log(`  ${tierColor(t.tier.padEnd(8))} ${t.target}  ${dim(t.dimensions.join(", "))}${t.hazards.length ? cyan("  ⚑ " + t.hazards.join("/")) : ""}`);
+    }
+    if (risky.length > 15) console.log(dim(`  … and ${risky.length - 15} more`));
   }
 
   console.log(`\n${bold("what to do")}`);

@@ -81,8 +81,8 @@ export default async function AgentRiskmapPlugin(ctx: any) {
     tool: {
       agent_riskmap: tool({
         description:
-          "Control agent-riskmap. action \"scan\" (with dir): scan an agent surface for hazardous capability " +
-          "combinations (EXFIL/RCE/DROP) and seed the triage ledger. \"status\": show the ledger. \"stop\": halt the loop.",
+          "Control agent-riskmap. action \"scan\" (with dir): profile every skill on an agent surface along the " +
+          "seven risk dimensions, compose the six hazards, and seed the review ledger. \"status\": show the ledger. \"stop\": halt the loop.",
         args: {
           action: tool.schema.string().describe("scan | status | stop"),
           dir: tool.schema.string().optional().describe("Surface to scan (for scan)"),

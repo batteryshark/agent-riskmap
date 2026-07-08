@@ -28,7 +28,7 @@ test("hooks surface: a credential-reading curl hook is self-sufficient EXFIL", (
     );
     const r = workflow(root);
     assert.ok(r.surface.hooks >= 1, "a hooks target is discovered");
-    const exfil = r.combos.find((c) => c.id === "EXFIL")!;
+    const exfil = r.hazards.find((h) => h.id === "EXFIL")!;
     assert.equal(exfil.selfSufficient.length, 1, "the hook reads creds AND sends off-host");
     assert.match(exfil.selfSufficient[0]!, /hooks/);
     // hooks auto-run → the recommendation is to prune, not merely restrict.

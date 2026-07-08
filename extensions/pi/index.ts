@@ -130,9 +130,9 @@ export default function agentRiskmapExtension(pi: ExtensionAPI) {
     name: "agent_riskmap_scan",
     label: "agent-riskmap scan",
     description:
-      "Scan an agent surface (a directory of skills / MCP servers / hooks / prompts / extensions) for " +
-      "hazardous capability combinations (EXFIL / RCE / DROP) and seed the triage ledger. Returns a " +
-      "summary; then triage each seeded finding with the `ledger` tool.",
+      "Scan an agent surface (skills / MCP servers / hooks / prompts / extensions): profile every skill " +
+      "along the seven risk dimensions, compose the six hazards, and seed the review ledger (one item per " +
+      "skill). Returns a summary; then review each skill with the `ledger` tool.",
     parameters: Type.Object({
       dir: Type.String({ description: "Path to the agent surface to scan" }),
     }),
