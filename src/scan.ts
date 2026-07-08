@@ -11,7 +11,7 @@
  *   prompt — instruction surface (CLAUDE.md, slash-command / subagent .md files)
  *            that can steer the agent (the AITM / steerability surface)
  *
- * Each target's text is scanned for capability atoms via scan-core (content
+ * Each target's text is scanned for capability atoms via the scanner (content
  * signatures + callee classification against the vendored taxonomy packs). Hooks
  * and settings-referenced MCP servers are scanned from their command strings.
  */

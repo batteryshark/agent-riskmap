@@ -1,13 +1,9 @@
 /**
- * Reader + matcher for `parallax-signature-pack/v1` packs.
+ * Reader + matcher for `riskmap-signature-pack/v1` packs.
  *
- * Faithful TypeScript port of the upstream Python loader
- * (`parallax/prlx/prlx/signatures.py`). The taxonomy owns the surface→atom
- * mappings; the engine owns extraction mechanics. This module is the *engine*
- * side for a JS scanner, reading the exact same pack JSON the Python engine
- * reads — so detection knowledge is single-sourced, never forked.
- *
- * Parity is asserted against the Python `classify_callee` in `scripts/parity.ts`.
+ * The ruleset owns the surface→atom mappings (what a callee or pattern means); this
+ * module owns the extraction mechanics (loading, normalization, matching). It reads
+ * the JSON packs under `data/signatures/`, so detection knowledge lives in one place.
  */
 
 import { readFileSync } from "node:fs";
@@ -102,7 +98,7 @@ export class SignaturePackError extends Error {
   }
 }
 
-const SCHEMA_VERSION = "parallax-signature-pack/v1";
+const SCHEMA_VERSION = "riskmap-signature-pack/v1";
 
 /** Mirror of Python `_norm`: fold member separators, then lowercase. */
 function norm(callee: string, caseSensitive: boolean): string {
@@ -193,8 +189,7 @@ export function loadSignaturePack(path: string): SignaturePack {
   if (!abs.toLowerCase().endsWith(".json")) {
     throw new SignaturePackError(
       `unsupported signature pack extension for ${abs} ` +
-        `(scan-core reads JSON; build YAML→JSON via ` +
-        `parallax-taxonomy/scripts/build-signature-json)`,
+        `(signature packs must be JSON, e.g. data/signatures/packs/*.json)`,
     );
   }
   let raw: string;

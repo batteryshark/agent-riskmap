@@ -9,10 +9,9 @@ decided to build that. It *emerged* from co-enabling two safe-looking things.
 combinations**, the overall **posture**, and what to **restrict / prune / gate
 behind HITL**.
 
-No graphs, no decompiler, no LLM required for the scan itself. It is a fast,
-deterministic pass over the same detection data the
-[parallax](https://github.com/batteryshark/parallax) engine uses, reimplemented in
-pure TypeScript.
+No graphs, no decompiler, no LLM needed for the scan itself. It is a fast,
+deterministic pass over a bundled detection ruleset, written in pure TypeScript with
+no runtime dependencies.
 
 ## Install
 
@@ -48,13 +47,14 @@ surface. Big data subdirs (transcripts, `node_modules`) are skipped.
 
 ## What it flags: dimensions & hazards
 
-Each skill is profiled along **seven risk dimensions** (see
+Each skill is profiled along **eight risk dimensions** (see
 [docs/RISK-TAXONOMY.md](./docs/RISK-TAXONOMY.md)):
 
 > ① **Action Authority** (send / post / delete) · ② **Data Access & Scope** ·
 > ③ **Latent Capability / Delegation** (run code, spawn agents) · ④ **Guardrail
 > Posture** (bypass permissions) · ⑤ **Steerability / Injection** (consumes untrusted
-> input) · ⑥ **Reach** (egress) · ⑦ **Persistence / Autonomy**
+> input) · ⑥ **Reach** (egress) · ⑦ **Persistence / Autonomy** · ⑧ **Delegated Trust**
+> (an opaque MCP server that can change under you, poison your context, or drive your inference)
 
 Dimensions compose into **six hazards**, either self-sufficient (one skill holds both
 parts) or a cross-skill pairing (two co-enabled skills each hold a part):
@@ -78,7 +78,7 @@ model must choose to call, so those are `[prune]`, not just `[restrict]`.
 ## Example
 
 ```
-$ agent-riskmap ~/.hermes/skills
+$ agent-riskmap ~/.claude/plugins
 
 surface: 74 skills
 
@@ -107,6 +107,31 @@ scan seeds a ledger, then your harness model adjudicates each finding item by it
 reads the cited evidence, follows the flow, and **confirms / dismisses / gates** it.
 The ledger owns termination; the model never self-terminates or invents findings.
 See [LOOP.md](./LOOP.md).
+
+## MCP servers you cannot read
+
+Skills, hooks, and prompts you can read. A remote MCP server you often cannot. Point
+agent-riskmap at an MCP config and it connects as a client, captures the advertised
+surface with no source, and profiles it like everything else:
+
+```sh
+agent-riskmap mcp mcp.json                  # protocol version, tools, prompts, resources, capabilities
+agent-riskmap mcp mcp.json --read-resources # also read resource bodies (a poisoning surface)
+agent-riskmap mcp mcp.json --drive-search   # drive a tool-search meta-tool to reveal hidden tools
+agent-riskmap <dir> --connect               # fold the surface's MCP servers into the main report
+```
+
+It never invokes a tool, only `initialize`, the list methods, and resource reads. It
+records what the server tries to do to *you* during the probe (ask to run your model,
+prompt your user, read your filesystem roots), scrubs secrets from what it captures,
+and flags the delegated-trust facets: opaque, volatile (the tool set can change),
+poisoning, sampling, elicitation.
+
+Two caveats worth remembering. What you capture is a snapshot, and it depends on the
+headers you send, which is why the tool takes a whole `mcp.json` with its auth. A
+server can serve different tools to different callers, so treat everything it tells
+you as untrusted. Live MCP probing uses the optional `@modelcontextprotocol/sdk`;
+install it if you want the `mcp` command (the static scan needs nothing).
 
 ## Limits
 

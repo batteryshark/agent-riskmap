@@ -2,9 +2,9 @@
  * Text scanner: apply a content pack's regex signatures and extract+classify
  * call tokens against a callee pack, producing atom observations.
  *
- * Callee extraction uses the regex fallback (`token(`) — the same fallback the
- * Python engine uses when tree-sitter is unavailable. A tree-sitter frontend can
- * replace `extractCalls` later for higher fidelity; the classification is shared.
+ * Callee extraction uses a regex fallback (`token(`) rather than a full parser. A
+ * tree-sitter frontend could replace `extractCalls` later for higher fidelity; the
+ * classification step is independent of how the tokens are extracted.
  */
 
 import { join } from "node:path";

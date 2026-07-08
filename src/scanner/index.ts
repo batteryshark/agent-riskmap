@@ -11,6 +11,4 @@ export {
   type GateAction,
 } from "./signature-pack.js";
 
-export { taxonomyRoot, resolveSourceCalleePack, loadSourceCalleePack } from "./taxonomy.js";
-
 export { Scanner, loadScanner, type Observation } from "./scanner.js";

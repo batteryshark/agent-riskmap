@@ -1,7 +1,7 @@
 /**
- * Vendored parallax-taxonomy detection data. Mirrors the taxonomy layout
- * (`signatures/schema.json`, `signatures/packs/*.json`, `reference/*.json`) so a
- * taxonomy-aware resolver can treat `rulesDataRoot()` as a taxonomy checkout.
+ * Vendored detection ruleset (signature packs + reference tables). Laid out as
+ * `signatures/schema.json`, `signatures/packs/*.json`, and `reference/*.json`, so
+ * `rulesDataRoot()` points at a self-contained data root.
  *
  * Ships as JSON under `data/` (see package `files`); `../data` is one level up
  * from both `src/` (dev) and `dist/` (built).

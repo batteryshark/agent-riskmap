@@ -1,6 +1,6 @@
 {
-  "schema_version": "parallax-signature-pack/v1",
-  "id": "parallax.content-surfaces",
+  "schema_version": "riskmap-signature-pack/v1",
+  "id": "riskmap.content-surfaces",
   "name": "Content and extracted-string surfaces",
   "version": "0.5.0",
   "status": "draft",

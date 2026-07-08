@@ -1,6 +1,6 @@
 {
-  "schema_version": "parallax-signature-pack/v1",
-  "id": "parallax.binary-imports",
+  "schema_version": "riskmap-signature-pack/v1",
+  "id": "riskmap.binary-imports",
   "name": "Binary import-symbol surfaces",
   "version": "0.1.0",
   "status": "draft",

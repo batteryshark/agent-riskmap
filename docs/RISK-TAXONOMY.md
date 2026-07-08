@@ -49,7 +49,7 @@ the fourth a *multiplier*, five and six are *exposure to untrusted control*, sev
 
 ### Dimension 8 — Delegated Trust (MCP servers)
 
-Skills, hooks, and prompts you can *read*. An MCP server you often cannot — especially
+Skills, hooks, and prompts you can *read*. An MCP server you often cannot, especially
 a remote one. `agent-riskmap mcp <config>` connects to each server as a client and
 captures the **advertised surface** (protocol revision, capabilities, tools + schemas +
 annotations, prompts, resources, and optionally resource bodies) without invoking any
@@ -66,7 +66,7 @@ adds what is *specific* to trusting a black box, as facets:
 
 The probe advertises `sampling` / `elicitation` / `roots` and records what the server
 *tries* to do to the client (a server that asks to run your model even during
-discovery is a strong signal). It only observes discovery-time requests — a server
+discovery is a strong signal). It only observes discovery-time requests. A server
 that samples only inside a tool call isn't seen, because we never invoke tools.
 
 **Tool search** is a server feature: a progressive-disclosure meta-tool can hide the

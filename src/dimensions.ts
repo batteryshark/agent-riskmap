@@ -2,7 +2,7 @@
  * The agent-skill risk dimensions (see docs/RISK-TAXONOMY.md).
  *
  * A skill is profiled along seven dimensions. Signals come from two sources:
- *   - ATOMS: the code capability atoms from scan-core (deterministic, syntactic).
+ *   - ATOMS: the code capability atoms from the scanner (deterministic, syntactic).
  *   - PATTERNS: high-signal instruction phrases matched over the skill's text —
  *     the cheap deterministic hints for the semantic-heavy dimensions.
  * Both are *hints*. They pre-score every skill (pessimistically) for the semantic

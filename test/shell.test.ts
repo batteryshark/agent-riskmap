@@ -1,14 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { loadScanner, taxonomyRoot } from "../src/scanner/index.js";
+import { loadScanner } from "../src/scanner/index.js";
+import { rulesDataRoot } from "../src/rules.js";
 
 /** Shell command extraction is what makes hooks and .sh tools classify: bare
  * command words (`curl x`) have no `(`, so the `token(` path never sees them. */
 test("shell head-command words classify (curl/nc/rm/base64, wrappers, pipes)", () => {
-  const root = taxonomyRoot();
-  assert.ok(root, "taxonomy not found; set PRLX_TAXONOMY_ROOT");
-  const scanner = loadScanner(root!);
+  const scanner = loadScanner(rulesDataRoot());
 
   const atomsOf = (text: string): Set<string> =>
     new Set(scanner.scanText(text, "shell").map((o) => o.atom));
@@ -28,9 +27,7 @@ test("shell head-command words classify (curl/nc/rm/base64, wrappers, pipes)", (
 });
 
 test("shell head extraction is position-sensitive", () => {
-  const root = taxonomyRoot();
-  assert.ok(root, "taxonomy not found");
-  const scanner = loadScanner(root!);
+  const scanner = loadScanner(rulesDataRoot());
   const atomsOf = (t: string): Set<string> =>
     new Set(scanner.scanText(t, "shell").map((o) => o.atom));
 

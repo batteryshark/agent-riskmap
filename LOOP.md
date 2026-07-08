@@ -40,7 +40,7 @@ with no markers falls back to one target per child.
 ## 2. Dimension profile: what can each skill do, and be tricked into?
 
 `scanTarget` reads a target's text and produces two kinds of **hints**:
-*atoms* via scan-core (content signatures + callee classification on real code and
+*atoms* via the scanner (content signatures + callee classification on real code and
 shell command heads: `subprocess.run` → `EXEC.PROC`, `fetch` → `NETW.HTTP`,
 `fs.readFileSync('~/.aws/credentials')` → `CRED.*`) and *instruction patterns*,
 high-precision phrases matched over the prose (`--dangerously-skip-permissions`,
@@ -106,5 +106,5 @@ termination.
   stop*.
 - **Durable**: the ledger writes atomically (temp + rename), so a long triage run
   survives crashes with a valid state file.
-- **Portable**: scanner and ledger are pure TypeScript reading the same taxonomy
-  data the Python engine reads. No Python, no subprocess.
+- **Portable**: the scanner and ledger are pure TypeScript reading the bundled
+  ruleset. No subprocess, no external services.

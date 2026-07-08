@@ -1,12 +1,12 @@
 {
-  "schema_version": "parallax-signature-pack/v1",
-  "id": "parallax.source-callees",
+  "schema_version": "riskmap-signature-pack/v1",
+  "id": "riskmap.source-callees",
   "name": "Source callee signatures",
   "version": "0.3.0",
   "status": "experimental",
-  "description": "Durable callee-to-atom mappings extracted from the Parallax reference engine rules tables.",
+  "description": "Durable callee-to-atom mappings extracted from the Riskmap reference engine rules tables.",
   "owners": [
-    "parallax-taxonomy"
+    "riskmap-taxonomy"
   ],
   "observation_gates": [
     {

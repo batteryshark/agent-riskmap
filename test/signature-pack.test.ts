@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { SignaturePack, loadSourceCalleePack, type SignatureRule } from "../src/scanner/index.js";
+import { join } from "node:path";
+import { SignaturePack, loadSignaturePack, type SignatureRule } from "../src/scanner/index.js";
+import { rulesDataRoot } from "../src/rules.js";
 
 function rule(
   p: Partial<SignatureRule> & Pick<SignatureRule, "atom" | "mode" | "values">,
@@ -83,11 +85,11 @@ test("matcher: language selection incl. wildcard", () => {
   assert.equal(pack.classifyCallee("eval", "python")?.atom, "LOAD.EVAL"); // wildcard applies
 });
 
-const real = loadSourceCalleePack();
+const real = loadSignaturePack(join(rulesDataRoot(), "signatures", "packs", "source-callees.json"));
 
 test("real pack: loads with the expected shape", () => {
-  assert.ok(real, "parallax-taxonomy sibling not found; set PRLX_TAXONOMY_ROOT to a checkout");
-  assert.equal(real.id, "parallax.source-callees");
+  assert.ok(real, "the shipped source-callee pack should load");
+  assert.equal(real.id, "riskmap.source-callees");
   const callee = real.rules.filter((r) => r.surface === "callee");
   assert.ok(callee.length >= 77, `expected >=77 callee rules, got ${callee.length}`);
   assert.ok(real.observationGates.length >= 1, `expected observation gates, got ${real.observationGates.length}`);
@@ -96,8 +98,7 @@ test("real pack: loads with the expected shape", () => {
 /**
  * A value is "reachable by itself" only if feeding it back as a callee could
  * match its own rule. Two pack-data bug classes make some values unreachable
- * (tracked upstream in parallax-taxonomy, not matcher bugs — the parity test
- * proves TS == Python on all of these):
+ * (they are data quirks in the ruleset, not matcher bugs):
  *   1. "::"/"->" under any non-regex mode — normalization folds these on the
  *      callee but not on rule values.
  *   2. a "." under `base` mode — base compares only the last "."-segment.

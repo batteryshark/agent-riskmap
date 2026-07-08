@@ -35,8 +35,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test test/*.test.ts",
-    "parity": "node --import tsx scripts/parity.ts"
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "keywords": [
     "agent",

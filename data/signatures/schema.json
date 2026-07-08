@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://parallax.taxonomy/signatures/signature-pack.schema.json",
-  "title": "Parallax Signature Pack",
-  "description": "Versioned signature pack format for mapping stable code surfaces to Parallax ontology atoms.",
+  "$id": "https://riskmap.taxonomy/signatures/signature-pack.schema.json",
+  "title": "Riskmap Signature Pack",
+  "description": "Versioned signature pack format for mapping stable code surfaces to Riskmap ontology atoms.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "parallax-signature-pack/v1"
+      "const": "riskmap-signature-pack/v1"
     },
     "id": {
       "type": "string",
