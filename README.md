@@ -2,15 +2,17 @@
 
 **Point it at an agent surface. Map what your tools could be tricked into.**
 
-Agents accrete power one skill at a time. Each tool looks reasonable alone — but a
-credential reader plus a network sender is an exfiltration path, and nobody decided
-to build that; it *emerged* from co-enabling two safe-looking things. `agent-riskmap`
-scans an agent surface and maps the dangerous **capability combinations**, the
-overall **posture**, and what to **restrict / prune / gate behind HITL**.
+Agents accrete power one skill at a time. Each tool looks reasonable on its own,
+but a credential reader plus a network sender is an exfiltration path, and nobody
+decided to build that. It *emerged* from co-enabling two safe-looking things.
+`agent-riskmap` scans an agent surface and maps the dangerous **capability
+combinations**, the overall **posture**, and what to **restrict / prune / gate
+behind HITL**.
 
-No graphs, no decompiler, no LLM required for the scan itself — a fast, deterministic
-pass over the same detection data the [parallax](https://github.com/batteryshark/parallax)
-engine uses, reimplemented in pure TypeScript.
+No graphs, no decompiler, no LLM required for the scan itself. It is a fast,
+deterministic pass over the same detection data the
+[parallax](https://github.com/batteryshark/parallax) engine uses, reimplemented in
+pure TypeScript.
 
 ## Install
 
@@ -25,9 +27,11 @@ agent-riskmap ~/.claude          # your whole config surface   (short alias: ris
 agent-riskmap ~/.claude/plugins  # installed plugins/skills
 agent-riskmap ./my-skill         # a single skill/tool
 agent-riskmap <dir> --json       # full machine-readable report
+agent-riskmap <dir> --html       # self-contained HTML report (pipe to a file)
+agent-riskmap <dir> --html --ledger  # HTML report merged with triage verdicts
 ```
 
-## What it looks at — the agent surface
+## What it looks at: the agent surface
 
 Each discovered element is tagged with a **kind**:
 
@@ -42,7 +46,7 @@ Each discovered element is tagged with a **kind**:
 Point it at a project and it finds the tool *and* descends into a bundled `.claude/`
 surface. Big data subdirs (transcripts, `node_modules`) are skipped.
 
-## What it flags — dimensions & hazards
+## What it flags: dimensions & hazards
 
 Each skill is profiled along **seven risk dimensions** (see
 [docs/RISK-TAXONOMY.md](./docs/RISK-TAXONOMY.md)):
@@ -52,7 +56,7 @@ Each skill is profiled along **seven risk dimensions** (see
 > Posture** (bypass permissions) · ⑤ **Steerability / Injection** (consumes untrusted
 > input) · ⑥ **Reach** (egress) · ⑦ **Persistence / Autonomy**
 
-Dimensions compose into **six hazards** — self-sufficient (one skill holds both
+Dimensions compose into **six hazards**, either self-sufficient (one skill holds both
 parts) or a cross-skill pairing (two co-enabled skills each hold a part):
 
 | hazard | composition | meaning |
@@ -64,12 +68,12 @@ parts) or a cross-skill pairing (two co-enabled skills each hold a part):
 | **RCE** | untrusted-input × latent | untrusted input drives code execution |
 | **PERSIST** | latent × persistence | standing autonomous capability |
 
-**Posture is pessimistic** — "critical until proven otherwise": a guardrail bypass or
-autonomy on a capable skill defaults to `critical`; the review loop only downgrades on
-the record. Code atoms (real `subprocess`/credential reads) count as high blast; a mere
-*mention* of "API keys" in prose counts as medium — a mention is not an access. A
-**hook** that completes a hazard is worse than a tool the model must choose to call, so
-those are `[prune]`, not just `[restrict]`.
+**Posture is pessimistic**, "critical until proven otherwise": a guardrail bypass or
+autonomy on a capable skill defaults to `critical`, and the review loop only
+downgrades on the record. Code atoms (real `subprocess`/credential reads) count as
+high blast; a mere *mention* of "API keys" in prose counts as medium, because a
+mention is not an access. A **hook** that completes a hazard is worse than a tool the
+model must choose to call, so those are `[prune]`, not just `[restrict]`.
 
 ## Example
 
@@ -96,20 +100,20 @@ what to do
 
 ## How it runs (the loop)
 
-The CLI is the deterministic half — *always complete*. It lists reachable
-combinations but can't tell you which are *real*. For that, the **pi and opencode
+The CLI is the deterministic half, and it is *always complete*. It lists reachable
+combinations but cannot tell you which are *real*. For that, the **pi and opencode
 extensions** ([`extensions/`](./extensions/README.md)) add the triage loop: the same
-scan seeds a ledger, then your harness model adjudicates each finding item-by-item —
+scan seeds a ledger, then your harness model adjudicates each finding item by item,
 reads the cited evidence, follows the flow, and **confirms / dismisses / gates** it.
 The ledger owns termination; the model never self-terminates or invents findings.
 See [LOOP.md](./LOOP.md).
 
 ## Limits
 
-- Regex + shell-head detection, not full parsing — high recall, some coarse edges. It
-  finds *reachable capability*, not a proven exploit; treat findings as "gate/review,"
-  not "confirmed malicious."
-- Generic prompt-injection phrase detection isn't in yet, so prompt targets rarely
-  raise *steerability* on their own — see the note in [LOOP.md](./LOOP.md).
+- Regex + shell-head detection, not full parsing. High recall, some coarse edges. It
+  finds *reachable capability*, not a proven exploit, so treat findings as
+  "gate/review," not "confirmed malicious."
+- Generic prompt-injection phrase detection is not in yet, so prompt targets rarely
+  raise *steerability* on their own. See the note in [LOOP.md](./LOOP.md).
 
 Apache-2.0

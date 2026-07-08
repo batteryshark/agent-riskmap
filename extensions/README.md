@@ -1,10 +1,10 @@
 # agent-riskmap harness extensions
 
-The CLI (`agent-riskmap <dir>`) runs only the **deterministic** half — it maps the
+The CLI (`agent-riskmap <dir>`) runs only the **deterministic** half: it maps the
 hazardous capability combinations and stops. These extensions add the **agentic
-triage loop**: the scan seeds a ledger with every finding, then your harness model
+triage loop**. The scan seeds a ledger with every finding, then your harness model
 adjudicates each one (reads the cited evidence, follows the flow, and
-**confirms / dismisses / gates** it). The ledger owns termination — the model never
+**confirms / dismisses / gates** it). The ledger owns termination, so the model never
 self-terminates and never invents findings.
 
 ```
@@ -16,7 +16,7 @@ agent_riskmap_scan(dir)        ledger tool (per finding)
 ```
 
 Both extensions import the triage core from the package itself
-(`@stonefish-labs/agent-riskmap/triage` and `/ledger`) — no subprocess, no Python.
+(`@stonefish-labs/agent-riskmap/triage` and `/ledger`). No subprocess, no Python.
 
 ## Pi
 
