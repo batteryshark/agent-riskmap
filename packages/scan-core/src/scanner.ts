@@ -21,6 +21,42 @@ export interface Observation {
 
 const CALL_RE = /\b([A-Za-z_$][\w$.]*)\s*\(/g;
 
+// A shell command starts at the beginning of input or right after a command
+// separator / substitution opener. `curl https://x` has no `(`, so CALL_RE never
+// sees it; instead we walk each command position and take its head word.
+const SHELL_POS_RE = /(^|[\n;|&(){}`]|\$\()/g;
+// Head word may be a bare command (`curl`), an env-assign (`FOO=bar`, skipped),
+// or a path command (`/usr/bin/python3`, `./x.sh`) — basename-normalized below.
+const SHELL_TOKEN_RE = /^(?:\.{0,2}\/)?(?:[\w.-]+\/)*[A-Za-z_][\w.-]*(=\S*)?/;
+// Wrapper words that precede the real command; skip them and keep reading.
+const SHELL_WRAPPERS = new Set([
+  "sudo", "env", "command", "exec", "xargs", "nohup", "time", "then", "do",
+  "builtin", "nice", "setsid", "stdbuf", "doas",
+]);
+
+/** Extract head command words at shell command positions (basename-normalized). */
+function extractShellCommands(text: string): Array<{ word: string; index: number }> {
+  const out: Array<{ word: string; index: number }> = [];
+  SHELL_POS_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = SHELL_POS_RE.exec(text)) !== null) {
+    let i = m.index + m[0].length;
+    for (;;) {
+      while (i < text.length && (text[i] === " " || text[i] === "\t")) i++;
+      const tm = SHELL_TOKEN_RE.exec(text.slice(i, i + 128));
+      if (!tm) break;
+      const tok = tm[0];
+      if (tok.includes("=")) { i += tok.length; continue; } // FOO=bar env-assign
+      const bare = tok.replace(/^.*\//, ""); // /usr/bin/python3 -> python3
+      if (SHELL_WRAPPERS.has(bare)) { i += tok.length; continue; }
+      out.push({ word: bare, index: i });
+      break; // one command word per position
+    }
+    if (m[0] === "") SHELL_POS_RE.lastIndex++; // guard zero-width match
+  }
+  return out;
+}
+
 function lineNo(text: string, index: number): number {
   let n = 1;
   for (let i = 0; i < index && i < text.length; i++) if (text[i] === "\n") n++;
@@ -72,7 +108,23 @@ export class Scanner {
     // Callee extraction only on real code (a known language). Running it on prose
     // (`lang === "*"` — markdown/text) matches words like `function(` and inflates
     // atoms; content regexes still scan all text.
-    if (this.callee && lang !== "*") {
+    if (this.callee && lang === "shell") {
+      // Shell commands are bare words (`curl x`), not `token(` — walk command
+      // positions. This is what makes hooks and .sh tools classify at all.
+      for (const { word, index } of extractShellCommands(text)) {
+        const hit = this.callee.classifyCallee(word, lang);
+        if (hit) {
+          obs.push({
+            atom: hit.atom,
+            confidence: hit.confidence,
+            summary: hit.summary,
+            evidence: word,
+            line: lineNo(text, index),
+            rule: `callee.${hit.atom}`,
+          });
+        }
+      }
+    } else if (this.callee && lang !== "*") {
       for (const m of text.matchAll(CALL_RE)) {
         const token = m[1]!;
         const hit = this.callee.classifyCallee(token, lang);

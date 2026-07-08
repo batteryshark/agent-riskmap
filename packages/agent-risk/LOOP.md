@@ -17,25 +17,44 @@ declare itself done — the ledger's `resume()` is the sole arbiter of completio
         └────────────┴───────────────┴─── seed ledger ─────▶ resolve items
 ```
 
-## 1. Discovery — *what tools are here?*
+## 1. Discovery — *what is on this surface?*
 
-`sweep(root)` walks the directory and finds **targets**: the shallowest directory
-in each branch carrying a marker (`package.json`, `pyproject.toml`, `mcp.json`,
-`server.json`, `SKILL.md`, …). A folder of bare tool dirs with no markers falls
-back to one target per immediate child. One row per tool — a skill pack stays one
-target, not one per file.
+`discover(root)` walks the directory and finds **targets** — the elements of an
+agent surface, each tagged with a **kind**:
+
+| kind | what it is | how it's found |
+|---|---|---|
+| **skill** | a skill pack | `SKILL.md` |
+| **tool** | a code tool / extension | `package.json`, `pyproject.toml`, … |
+| **mcp** | an MCP server | `server.json`, or a reference in `settings.json` / `.mcp.json` (scanned via its launch command) |
+| **hooks** | inline shell that auto-runs on agent events | `hooks` block in a settings file |
+| **prompt** | instruction surface that can steer the agent | `CLAUDE.md`, `AGENTS.md`, `commands/` & `agents/` `.md` |
+
+Structural markers claim a directory and stop recursion there (one skill pack = one
+target, not one per file); settings and prompt files are additive and found wherever
+they appear — including inside a code tool's `.claude/`. A folder of bare tool dirs
+with no markers falls back to one target per child.
 
 → ledger: one `scan` item per target.
 
-## 2. Capability Map — *what can each tool do?*
+## 2. Capability Map — *what can each element do?*
 
-`scanTarget` reads every text/code file under a target and produces **atoms** via
-scan-core: content-regex signatures over raw text (URLs, secrets, exec idioms) plus
-regex-callee classification on real code (`subprocess.run` → `EXEC.PROC`,
-`fetch` → `NETW.HTTP`, `fs.readFileSync('~/.aws/credentials')` → `CRED.*`). Atoms
-roll up to **capability families**: `NET · BROWSER · EXEC · LOAD · CRED · FSWRITE ·
-INSTALL · AITM`. This is the always-complete substrate — the same detection data
-(the taxonomy packs) the Python engine uses, read by anything.
+`scanTarget` reads a target's text — files for skill/tool/prompt targets, the
+command strings for hooks and MCP references — and produces **atoms** via scan-core:
+content-regex signatures over raw text (URLs, secrets, `curl … | sh`) plus callee
+classification on real code (`subprocess.run` → `EXEC.PROC`, `fetch` → `NETW.HTTP`,
+`fs.readFileSync('~/.aws/credentials')` → `CRED.*`) and on **shell command heads**
+(`curl` → `NETW.HTTP`, `rm` → `FSYS.DELETE`, `base64` → `XFRM.ENCODE`) — which is
+what makes a hook or a `.sh` tool classify at all. Atoms roll up to **capability
+families**: `NET · BROWSER · EXEC · LOAD · CRED · FSWRITE · INSTALL · AITM`. This is
+the always-complete substrate — the same detection data (the taxonomy packs) the
+Python engine uses, read by anything.
+
+> Steerability note: today the `AITM` family fires only on a specific
+> Unicode-confusable prompt-marker mechanic, so prompt targets are inventoried and
+> capability-scanned but rarely raise steerability on generic "ignore previous
+> instructions" prose. Generic prompt-injection phrase detection is the top planned
+> enrichment (it belongs in the shared signature pack, with FP care).
 
 ## 3. Classification — *what dangerous shapes exist?*
 
