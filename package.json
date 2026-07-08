@@ -1,6 +1,6 @@
 {
   "name": "@stonefish-labs/agent-riskmap",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Point it at an agent surface (skills, MCP servers, hooks, prompts, extensions); it profiles each along eight risk dimensions, composes the agent-native hazards, and says what to restrict / prune / gate. Includes live introspection of remote/opaque MCP servers you have no source for.",
   "type": "module",
   "exports": {
