@@ -1,12 +1,12 @@
 {
-  "name": "@stonefish-labs/agent-risk",
+  "name": "@stonefish-labs/agent-riskmap",
   "version": "0.0.1",
   "description": "Point it at an agent surface (skills, MCP servers, hooks, prompts, extensions); it shows which capability combinations could lead to exfil or other hazards (EXFIL/RCE/DROP), the overall posture, and what to restrict / prune / gate behind HITL.",
   "type": "module",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "agent-risk": "./dist/cli.js" },
+  "bin": { "agent-riskmap": "./dist/cli.js", "riskmap": "./dist/cli.js" },
   "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",

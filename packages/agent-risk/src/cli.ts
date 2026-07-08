@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * agent-risk CLI:  agent-risk <dir> [--json]
- * Point it at an agent surface; it prints the hazardous capability combinations
+ * agent-riskmap CLI:  agent-riskmap <dir> [--json]   (short alias: riskmap)
+ * Point it at an agent surface; it maps the hazardous capability combinations
  * and what to restrict / prune / gate. --json emits the full report.
  */
 
@@ -17,7 +17,7 @@ function main(argv: string[]): number {
   const json = args.includes("--json");
   const dir = args.find((a) => !a.startsWith("--"));
   if (!dir) {
-    console.error("usage: agent-risk <dir> [--json]");
+    console.error("usage: agent-riskmap <dir> [--json]");
     return 1;
   }
 
@@ -33,7 +33,7 @@ function main(argv: string[]): number {
   const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
   const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`;
 
-  console.log(bold("agent-risk") + dim(`  —  ${report.question}`));
+  console.log(bold("agent-riskmap") + dim(`  —  ${report.question}`));
 
   const surface = (Object.entries(report.surface) as Array<[TargetKind, number]>)
     .filter(([, n]) => n > 0)

@@ -1,6 +1,6 @@
-# agent-risk: the loop
+# agent-riskmap: the loop
 
-agent-risk runs in two halves that meet at a **ledger**: a deterministic scan that
+agent-riskmap runs in two halves that meet at a **ledger**: a deterministic scan that
 is *always complete* seeds the work, and a ledger-driven ralph loop that adds
 *judgment* without ever deciding coverage. The agent can't skip a finding and can't
 declare itself done — the ledger's `resume()` is the sole arbiter of completion.

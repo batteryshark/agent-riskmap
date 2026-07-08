@@ -1,11 +1,11 @@
-# @stonefish-labs/agent-risk
+# @stonefish-labs/agent-riskmap
 
-**Point it at an agent surface. See what your tools could be tricked into.**
+**Point it at an agent surface. Map what your tools could be tricked into.**
 
 Agents accrete power one skill at a time. Each tool looks reasonable alone — but a
 credential reader plus a network sender is an exfiltration path, and nobody decided
-to build that; it *emerged* from co-enabling two safe-looking things. `agent-risk`
-scans an agent surface and shows you the dangerous **capability combinations**, the
+to build that; it *emerged* from co-enabling two safe-looking things. `agent-riskmap`
+scans an agent surface and maps the dangerous **capability combinations**, the
 overall **posture**, and what to **restrict / prune / gate behind HITL**.
 
 No graphs, no decompiler, no LLM required for the scan itself — a fast, deterministic
@@ -15,16 +15,16 @@ engine uses, reimplemented in pure TypeScript.
 ## Install
 
 ```sh
-npm i -g @stonefish-labs/agent-risk    # or: npx @stonefish-labs/agent-risk <dir>
+npm i -g @stonefish-labs/agent-riskmap   # or: npx @stonefish-labs/agent-riskmap <dir>
 ```
 
 ## Use
 
 ```sh
-agent-risk ~/.claude            # your whole config surface
-agent-risk ~/.claude/plugins    # installed plugins/skills
-agent-risk ./my-skill           # a single skill/tool
-agent-risk <dir> --json         # full machine-readable report
+agent-riskmap ~/.claude          # your whole config surface   (short alias: riskmap)
+agent-riskmap ~/.claude/plugins  # installed plugins/skills
+agent-riskmap ./my-skill         # a single skill/tool
+agent-riskmap <dir> --json       # full machine-readable report
 ```
 
 ## What it looks at — the agent surface
@@ -64,7 +64,7 @@ because it runs on its own — so those are flagged `[prune]`, not just `[restri
 ## Example
 
 ```
-$ agent-risk ~/.claude/plugins
+$ agent-riskmap ~/.claude/plugins
 
 surface: 23 skills · 4 mcp · 4 tools · 21 prompts
 

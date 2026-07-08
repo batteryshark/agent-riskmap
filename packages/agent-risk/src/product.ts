@@ -1,8 +1,8 @@
 /**
- * agent-risk workflow: discover → scan → families → combos → posture → report.
+ * agent-riskmap workflow: discover → scan → families → combos → posture → report.
  *
  * Point it at an agent surface (skills, MCP tools, hooks, prompts, extensions);
- * it reports which capability combinations could lead to exfil or other hazards,
+ * it maps which capability combinations could lead to exfil or other hazards,
  * and what to restrict / prune / gate behind HITL.
  */
 
@@ -11,7 +11,7 @@ import { discover, scanTarget, type TargetScan, type TargetKind } from "./scan.j
 import { families, analyzeCombos, type Family, type TargetFamilies, type CompResult } from "./combos.js";
 import { buildPosture, type Posture } from "./posture.js";
 
-export const PRODUCT = "agent-risk";
+export const PRODUCT = "agent-riskmap";
 export const QUESTION =
   "What can my agent be tricked into, and what does it become once it holds these tools?";
 
