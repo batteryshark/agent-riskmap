@@ -8,3 +8,5 @@ export {
   HAZARDS, analyzeHazards, selfSufficientHazards, type HazardId, type HazardResult,
 } from "./hazards.js";
 export { tierOfProfile, surfacePosture, type Posture, type Tier } from "./severity.js";
+export { descriptionGap, DIM_PLAIN, FACET_PLAIN, HAZARD_PLAIN, MULTIPLIER_PLAIN } from "./plain.js";
+export { mergeVerdicts } from "./triage.js";

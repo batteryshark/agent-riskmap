@@ -15,6 +15,7 @@ import {
 } from "./dimensions.js";
 import { analyzeHazards, selfSufficientHazards, type HazardResult, type HazardId } from "./hazards.js";
 import { tierOfProfile, surfacePosture, type Posture, type Tier } from "./severity.js";
+import { descriptionGap } from "./plain.js";
 
 export const PRODUCT = "agent-riskmap";
 export const QUESTION =
@@ -23,11 +24,15 @@ export const QUESTION =
 export interface TargetReport {
   target: string;
   kind: TargetKind;
+  description?: string;
   dimensions: Dimension[];
   facets: Facet[];
   hazards: HazardId[]; // self-sufficient for these
   tier: Tier;
+  multipliers: Dimension[]; // which fired (guardrail / steerability / persistence)
+  undisclosed: string[]; // detected capability (plain English) the declared description doesn't account for
   hints: DimHint[]; // capped, for triage evidence
+  verdict?: { status: string; label: string | null; result: string }; // triage, when a ledger is merged
 }
 
 export interface AgentRiskReport {
@@ -79,7 +84,7 @@ export function workflow(dir: string): AgentRiskReport {
   const scans: TargetScan[] = found.map((t) => scanTarget(root, t));
 
   const profiles: DimensionProfile[] = scans.map((s) =>
-    buildProfile(s.target, s.kind, s.atoms, s.evidence, s.dimHints),
+    buildProfile(s.target, s.kind, s.atoms, s.evidence, s.dimHints, s.description),
   );
   const kindOf = new Map<string, TargetKind>(scans.map((s) => [s.target, s.kind]));
 
@@ -128,14 +133,20 @@ export function workflow(dir: string): AgentRiskReport {
         .map((h) => ({ id: h.id, label: h.label, aName: h.aName, bName: h.bName, aOnly: h.aOnly, bOnly: h.bOnly, pairings: h.crossPairs })),
     },
     recommendations: recommend(hazards, kindOf),
-    targets: profiles.map((p) => ({
-      target: p.target,
-      kind: p.kind,
-      dimensions: DIMENSIONS.filter((d) => p.dims.has(d)),
-      facets: [...p.facets].sort(),
-      hazards: selfSufficientHazards(p),
-      tier: tierOfProfile(p).tier,
-      hints: p.hints.slice(0, 12),
-    })),
+    targets: profiles.map((p) => {
+      const posture = tierOfProfile(p);
+      return {
+        target: p.target,
+        kind: p.kind,
+        description: p.description,
+        dimensions: DIMENSIONS.filter((d) => p.dims.has(d)),
+        facets: [...p.facets].sort(),
+        hazards: selfSufficientHazards(p),
+        tier: posture.tier,
+        multipliers: posture.multipliers,
+        undisclosed: descriptionGap(p, p.description),
+        hints: p.hints.slice(0, 12),
+      };
+    }),
   };
 }

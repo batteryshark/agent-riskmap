@@ -88,6 +88,16 @@ export function loadState(cwd: string = process.cwd()): LedgerState | null {
   }
 }
 
+/** Load a ledger state from an explicit file path (vs. cwd-relative `loadState`). */
+export function loadStateFile(path: string): LedgerState | null {
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as LedgerState;
+  } catch {
+    return null;
+  }
+}
+
 export function saveState(state: LedgerState, cwd: string = process.cwd()): void {
   const dir = join(cwd, LEDGER_DIR);
   mkdirSync(dir, { recursive: true });

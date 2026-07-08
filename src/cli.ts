@@ -6,6 +6,10 @@
  */
 
 import { workflow } from "./product.js";
+import { renderHtml } from "./html.js";
+import { mergeVerdicts } from "./triage.js";
+import { loadState, loadStateFile } from "./ledger.js";
+import { resolve } from "node:path";
 import type { TargetKind } from "./scan.js";
 
 const KIND_LABEL: Record<TargetKind, string> = { skill: "skills", mcp: "mcp", tool: "tools", hooks: "hooks", prompt: "prompts" };
@@ -13,15 +17,34 @@ const KIND_LABEL: Record<TargetKind, string> = { skill: "skills", mcp: "mcp", to
 function main(argv: string[]): number {
   const args = argv.slice(2);
   const json = args.includes("--json");
-  const dir = args.find((a) => !a.startsWith("--"));
+  const html = args.includes("--html");
+  const ledgerIdx = args.indexOf("--ledger");
+  const useLedger = ledgerIdx !== -1;
+  const ledgerPathArg = useLedger && args[ledgerIdx + 1] && !args[ledgerIdx + 1]!.startsWith("--") ? args[ledgerIdx + 1] : undefined;
+  const dir = args.find((a) => !a.startsWith("--") && a !== ledgerPathArg);
   if (!dir) {
-    console.error("usage: agent-riskmap <dir> [--json]");
+    console.error("usage: agent-riskmap <dir> [--json] [--html] [--ledger [state.json]]");
     return 1;
   }
 
-  const report = workflow(dir);
+  let report = workflow(dir);
+
+  // Merge triage verdicts when asked, so --html renders the reviewed picture.
+  if (useLedger) {
+    const state = ledgerPathArg ? loadStateFile(ledgerPathArg) : loadState(resolve(dir));
+    if (!state) {
+      console.error(`ledger: no state found${ledgerPathArg ? ` at ${ledgerPathArg}` : ` under ${dir}/.ledger`}.`);
+      return 1;
+    }
+    report = mergeVerdicts(report, state);
+  }
+
   if (json) {
     console.log(JSON.stringify(report, null, 2));
+    return 0;
+  }
+  if (html) {
+    console.log(renderHtml(report, dir));
     return 0;
   }
 

@@ -132,6 +132,7 @@ export function scanDimensionPatterns(text: string, path: string): DimHint[] {
 export interface DimensionProfile {
   target: string;
   kind: TargetKind;
+  description?: string;
   dims: Set<Dimension>;
   facets: Set<Facet>;
   hints: DimHint[];
@@ -151,6 +152,7 @@ export function buildProfile(
   atoms: Record<string, number>,
   atomEvidence: Array<{ atom: string; path: string; line: number; evidence: string }>,
   patternHints: DimHint[],
+  description?: string,
 ): DimensionProfile {
   const hints = [...atomHints(atoms, atomEvidence), ...patternHints];
   const dims = new Set<Dimension>();
@@ -159,5 +161,5 @@ export function buildProfile(
     dims.add(h.dimension);
     if (h.facet) facets.add(h.facet);
   }
-  return { target, kind, dims, facets, hints };
+  return { target, kind, description, dims, facets, hints };
 }

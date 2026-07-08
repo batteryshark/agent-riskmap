@@ -20,6 +20,24 @@ export interface SeedResult {
   ledger: LedgerState;
 }
 
+/**
+ * Fold triage verdicts back into a report so a reviewed HTML render can show, per
+ * skill, what the model found it actually does plus the description-match verdict.
+ * Ledger items are keyed by target path; only terminal items with a result merge in.
+ */
+export function mergeVerdicts(report: AgentRiskReport, state: LedgerState): AgentRiskReport {
+  const byTarget = new Map<string, LedgerState["items"][number]>();
+  for (const it of state.items) {
+    if (it.result && ["resolved", "accepted", "blocked"].includes(it.status)) byTarget.set(it.target, it);
+  }
+  const targets = report.targets.map((t) => {
+    const item = byTarget.get(t.target);
+    if (!item || !item.result) return t;
+    return { ...t, verdict: { status: item.status, label: item.state_label, result: item.result } };
+  });
+  return { ...report, targets };
+}
+
 function crossRoles(report: AgentRiskReport, target: string): string[] {
   const out: string[] = [];
   for (const c of report.overview.crossSkillCompositions) {
@@ -37,6 +55,10 @@ function evidenceFor(report: AgentRiskReport, t: TargetReport): string {
   const cross = crossRoles(report, t.target);
   return (
     `SKILL: ${t.target}  (kind: ${t.kind})\n` +
+    `DECLARED PURPOSE (a discovery label — verify the skill actually does only this): ${t.description ?? "(none)"}\n` +
+    (t.undisclosed.length
+      ? `UNDECLARED-LOOKING CAPABILITY (detected, not implied by the label): ${t.undisclosed.join("; ")}\n`
+      : "") +
     `Deterministic profile (a PESSIMISTIC prior — confirm, refine, or downgrade):\n` +
     `  dimensions: ${t.dimensions.join(", ") || "none detected"}\n` +
     `  facets:     ${t.facets.join(", ") || "—"}\n` +
@@ -97,8 +119,13 @@ export const TRIAGE_CONTRACT = `## THE CONTRACT
 
 export const TRIAGE_PROCEDURE = `## HOW TO REVIEW ONE SKILL
 1. \`ledger\` action "next" → the skill; then "start", id "<id>" (state_label → "evaluating").
-2. Read the skill's files (esp. SKILL.md). Assess it along the seven dimensions — do not just
-   trust the hints; understand what the skill ENABLES the agent to do (latent functionality):
+2. Read the skill's files (esp. SKILL.md). First decide WHAT THE SKILL ACTUALLY DOES, in one or two
+   plain sentences, as if explaining it to someone who is not a security person. Then compare that to
+   the DECLARED PURPOSE in the profile — does the skill do only what its label says, or does it hold
+   capability the label hides? Note any UNDECLARED-LOOKING CAPABILITY flagged in the profile and
+   confirm or reject it from the actual content.
+3. Assess it along the seven dimensions — do not just trust the hints; understand what the skill
+   ENABLES the agent to do (latent functionality):
    - ① Action Authority — can it send / post / share, or delete / overwrite / revoke on your behalf?
    - ② Data Access & Scope — what sensitive data can it read, and how much (a file vs your whole mailbox)?
    - ③ Latent Capability — does it run arbitrary code, install software, or DELEGATE to another agent?
@@ -106,17 +133,21 @@ export const TRIAGE_PROCEDURE = `## HOW TO REVIEW ONE SKILL
    - ⑤ Steerability — does it consume UNTRUSTED content (web, email, files) that could steer it?
    - ⑥ Reach — network egress / external services.
    - ⑦ Persistence — does it run unattended / schedule / survive sessions?
-3. Identify hazards (dimension compositions): EXFIL (data×reach), Unauthorized-Communication
+4. Identify hazards (dimension compositions): EXFIL (data×reach), Unauthorized-Communication
    (outbound-authority×steerability), Destructive-Action (destructive-authority×steerability),
    Guardrail-Defeat (latent×bypass), RCE (untrusted-input×code), Autonomous-Persistence.
    Tag any high-stakes DOMAIN (financial / medical / legal) — it raises severity.
-4. Record the verdict via the \`ledger\` tool:
-   - "resolve"  — real / plausible risk. result = the hazards + the final tier + the gate you
-     recommend (sandbox / require HITL / keep skills in separate agents). label "confirmed"
+5. Record the verdict via the \`ledger\` tool. The RESULT text MUST start with two lines:
+      WHAT IT DOES: <your plain-English summary of what the skill actually does>
+      LABEL MATCH: <matches | understates | overstates | mismatch> — <one-line why>
+   then continue with the hazards, final tier, and recommended gate:
+   - "resolve"  — real / plausible risk. result = the two lines above + hazards + final tier + the gate
+     you recommend (sandbox / require HITL / keep skills in separate agents). label "confirmed"
      (or "gated" if already mitigated).
-   - "accept"   — the pessimistic prior was over-stated / benign. rationale = why (this is a
-     DOWNGRADE, so justify it). label "dismissed".
-   - "block"    — needs a human policy decision. reason = what's needed. label "needs-human".
+   - "accept"   — the pessimistic prior was over-stated / benign. rationale = the two lines above +
+     why this is a DOWNGRADE. label "dismissed".
+   - "block"    — needs a human policy decision. reason = the two lines above + what's needed.
+     label "needs-human".
 state_label lifecycle: new → evaluating → (confirmed | gated | dismissed | needs-human).
 Reminder: guardrail-bypass or autonomy defaults to CRITICAL — only lower it with evidence.`;
 

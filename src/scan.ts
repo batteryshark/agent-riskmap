@@ -79,11 +79,57 @@ export interface Target {
 export interface TargetScan {
   target: string;
   kind: TargetKind;
+  /** Declared purpose (SKILL.md frontmatter / package.json description). A discovery label, not ground truth. */
+  description?: string;
   atoms: Record<string, number>;
   fileCount: number;
   evidence: Array<{ atom: string; path: string; line: number; evidence: string }>;
   /** Instruction-pattern dimension hints (the semantic-heavy dimensions). */
   dimHints: DimHint[];
+}
+
+/** Pull `name`/`description` out of a YAML frontmatter block (no dep). */
+function extractFrontmatter(text: string): { name?: string; description?: string } {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+  if (!m || !m[1]) return {};
+  const block = m[1];
+  const get = (key: string): string | undefined => {
+    const line = new RegExp(`^${key}:\\s*(.*)$`, "m").exec(block);
+    if (!line || !line[1]) return undefined;
+    let v = line[1].trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+    return v || undefined;
+  };
+  return { name: get("name"), description: get("description") };
+}
+
+/** A target's declared purpose, if discoverable from its marker/manifest file. */
+function descriptionFor(target: Target): string | undefined {
+  const read = (p: string): string | undefined => {
+    try {
+      return readFileSync(p, "utf8");
+    } catch {
+      return undefined;
+    }
+  };
+  if (target.dir) {
+    if (target.kind === "skill") {
+      const fm = read(join(target.dir, "SKILL.md"));
+      if (fm) return extractFrontmatter(fm).description;
+    }
+    if (target.kind === "tool" || target.kind === "mcp") {
+      const pkg = read(join(target.dir, "package.json"));
+      if (pkg) {
+        try {
+          const d = (JSON.parse(pkg) as { description?: string }).description;
+          if (d) return d;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }
+  return undefined;
 }
 
 function safeReaddir(dir: string): string[] {
@@ -381,5 +427,5 @@ export function scanTarget(root: string, target: Target): TargetScan {
     walk(target.dir);
   }
 
-  return { target: target.path, kind: target.kind, atoms, fileCount, evidence, dimHints };
+  return { target: target.path, kind: target.kind, description: descriptionFor(target), atoms, fileCount, evidence, dimHints };
 }
