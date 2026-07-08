@@ -72,14 +72,18 @@ dangerous the moment both are co-enabled in one agent. **Posture** = blast radiu
 (capability severity) × steerability (any `AITM` surface) → `minimal / moderate /
 elevated / critical`.
 
-→ ledger: one `review` item per self-sufficient target and per cross-skill pairing,
-seeded with `state_label: new`. Deterministic findings are authoritative
-detections — the loop never re-runs detection or invents findings.
+→ ledger: one `review` item per self-sufficient target and per cross-skill
+**composition** (not per pairing — sources × sinks is combinatorial, but the
+adjudication is a single decision: "are these real, and should they be
+co-enabled?"), seeded with `state_label: new`. Deterministic findings are
+authoritative detections — the loop never re-runs detection or invents findings.
 
 ## 4. Triage — *is each finding real, and what do we do?*
 
-A ledger-driven ralph loop (the pi/opencode extension registers a `ledger` tool and
-drives turns). For each `review` item the harness model:
+A ledger-driven ralph loop, shipped as the pi and opencode extensions under
+[`extensions/`](./extensions/README.md): the `agent_riskmap_scan` tool seeds the
+ledger from the deterministic scan, the `ledger` tool adjudicates, and `resume()`
+drives the turns. For each `review` item the harness model:
 
 1. `ledger next` → the item; `ledger start`.
 2. Reads the cited evidence (files/lines), follows the data/control flow.

@@ -85,9 +85,13 @@ what to do
 
 ## How it runs (the loop)
 
-The CLI is the deterministic half — *always complete*. For interactive triage, the
-same scan seeds a ledger that a harness model works item-by-item (confirm / dismiss /
-gate). See [LOOP.md](./LOOP.md).
+The CLI is the deterministic half — *always complete*. It lists reachable
+combinations but can't tell you which are *real*. For that, the **pi and opencode
+extensions** ([`extensions/`](./extensions/README.md)) add the triage loop: the same
+scan seeds a ledger, then your harness model adjudicates each finding item-by-item —
+reads the cited evidence, follows the flow, and **confirms / dismisses / gates** it.
+The ledger owns termination; the model never self-terminates or invents findings.
+See [LOOP.md](./LOOP.md).
 
 ## Limits
 

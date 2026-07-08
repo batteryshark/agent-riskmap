@@ -1,0 +1,9 @@
+{
+  "name": "agent-riskmap-pi",
+  "private": true,
+  "type": "module",
+  "description": "Pi extension: scan an agent surface and triage its hazardous capability combinations.",
+  "dependencies": {
+    "@stonefish-labs/agent-riskmap": "^0.0.1"
+  }
+}

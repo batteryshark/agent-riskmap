@@ -21,6 +21,8 @@ export interface TargetReport {
   families: Family[];
   atoms: Record<string, number>;
   fileCount: number;
+  /** A few citations (capped) so triage can read where each capability was seen. */
+  evidence: Array<{ atom: string; path: string; line: number; evidence: string }>;
 }
 
 export interface AgentRiskReport {
@@ -148,6 +150,7 @@ export function workflow(dir: string): AgentRiskReport {
       families: [...families(Object.keys(s.atoms))].sort(),
       atoms: s.atoms,
       fileCount: s.fileCount,
+      evidence: s.evidence.slice(0, 8),
     })),
   };
 }
