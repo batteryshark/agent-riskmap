@@ -1,7 +1,8 @@
 # Agent-Skill Risk Taxonomy
 
-Status: design spec (v0.1). Drives the planned **hybrid** detector (deterministic
-hints + semantic per-skill review). Grounded in the hermes skill corpus (74 skills).
+Status: design spec (v0.2 — dimension/hazard/severity decisions resolved). Drives the
+planned **hybrid** detector (deterministic hints + semantic per-skill review).
+Grounded in the hermes skill corpus (74 skills).
 
 ## Why this exists — the gap in v1
 
@@ -73,16 +74,31 @@ holds all parts) or a **cross-skill pairing** (two co-enabled skills each hold a
 | Hazard | Composition | Meaning | v1 coverage |
 |---|---|---|---|
 | **Data Exfiltration** | Data-Access(sensitive) × Reach(egress) | read sensitive data, send it off-host | partial — EXFIL, secrets only |
-| **Unauthorized Action** | Action-Authority(outward) × Steerability(untrusted input) | attacker content steers the agent into acting on your accounts (send/post/pay) | **missed entirely** |
+| **Unauthorized Communication** | Action-Authority(outbound: send / post / message / share) × Steerability(injection) | the agent sends something out you didn't intend, on an attacker's cue | **missed entirely** |
+| **Destructive Action** | Action-Authority(destructive: delete / overwrite / revoke / drop) × Steerability(injection) | the agent destroys / overwrites something you didn't intend | **missed entirely** |
 | **Guardrail Defeat** | Latent-Capability(code/delegation) × Guardrail-Bypass | spawn unsandboxed exec / bypass permissions | **missed** — `claude-code` |
 | **Remote Code Execution** | Reach(untrusted input) × Latent-Capability(exec) | network input drives code execution | yes — RCE |
-| **Destructive Action** | Action-Authority(destructive) × Steerability | tricked into delete / overwrite / transfer | **missed** |
 | **Autonomous Persistence** | Latent-Capability × Persistence × Reach | standing, self-perpetuating autonomous authority | **missed** |
 
-Four of six agent-native hazards are invisible to v1. **Unauthorized Action** is the
-most important miss: it is the classic prompt-injection→real-world-action chain (an
-email the agent reads tells it to forward your inbox; a web page tells it to post),
-and it depends on Steerability × Authority — neither of which v1 detects.
+Five of six agent-native hazards are invisible or partial in v1. The two that matter
+most, and are wholly missed, both stem from **Action-Authority × Steerability** — the
+prompt-injection→real-world-action chain — but they are kept **separate on purpose**,
+because they fail in fundamentally different ways:
+
+- **Unauthorized Communication** — "sent something you didn't mean to." An email the
+  agent reads tells it to forward your inbox; a web page tells it to post. *Outbound.*
+- **Destructive Action** — "destroyed something you didn't mean to." A file/record the
+  agent processes tells it to delete or overwrite. *Irreversible loss.*
+
+Neither depends on secrets or code — only on the skill having outbound/destructive
+authority and consuming untrusted content. v1 sees neither.
+
+> **Domain risk is orthogonal, not a hazard.** *Financial* (money transfer, purchase),
+> *medical*, *legal*, etc. are **domains** a skill operates in — they don't add a hazard
+> type, they **raise the severity** of the hazards above (an unauthorized send of a wire
+> transfer is far worse than an unauthorized tweet) and are exactly the kind of context
+> the model must **reason over per skill**, not match. Tag domain as context; let it
+> weight severity.
 
 ## Level 3 — Severity / posture
 
@@ -96,6 +112,16 @@ blast_radius   = worst reachable hazard, scored by reversibility × sensitivity 
 
 The v1 posture formula (`blast × steerability`) is the special case where the only
 multiplier is AITM. This generalizes it.
+
+**Multipliers default pessimistic — "critical until proven otherwise."** The
+deterministic pass assumes every present multiplier *bites*: a capable skill with any
+guardrail-bypass is `critical` by default; an unattended / autonomous capable skill is
+`elevated`+ by default. Only the **semantic pass may downgrade**, and only with a
+recorded rationale (e.g. "the `--dangerously-skip-permissions` path is gated behind an
+explicit user confirmation," "the persistence is one-time setup, not standing
+authority"). This mirrors the whole architecture: the deterministic floor is
+conservative and high-recall — it never quietly under-rates — and the model earns every
+reduction on the record. Risk is never downgraded silently.
 
 ## Detection method per dimension — the hybrid blueprint
 
@@ -145,8 +171,23 @@ skill to fill the judgment dimensions and to reject keyword false positives
 4. **Output** extends the existing report: a per-skill dimension profile + hazard list
    + the same restrict / prune / gate actions, now spanning agent-native risk.
 
-Open questions for review before implementing the hybrid:
-- Dimension set — are seven the right cut? (candidate merges: 5+6 as "exposure"?)
-- Hazard list — is "Unauthorized Action" one hazard or split (comms vs financial vs
-  destructive)?
-- Severity weights — how much do the guardrail / autonomy multipliers move the tier?
+## Resolved decisions (v0.2)
+
+1. **Dimension cut — keep seven; ⑤ Steerability and ⑥ Reach stay separate.** Inbound
+   (untrusted content that can steer) and outbound (where data/actions can go) are not
+   the same axis: injection drives Unauthorized Communication / Destructive Action,
+   egress drives Exfiltration. Merging them would collapse hazards that must stay
+   distinct.
+2. **Hazards — "Unauthorized Action" splits into Unauthorized Communication +
+   Destructive Action.** Sending something you didn't mean to and destroying something
+   you didn't mean to fail differently and need different gates. **Financial and other
+   high-stakes domains are not hazards** — they are a domain overlay that raises
+   severity and that the model reasons over per skill.
+3. **Severity — multipliers default pessimistic ("critical until proven otherwise").**
+   Guardrail-bypass and autonomy push the tier up by default; only the semantic pass
+   downgrades, on the record.
+
+Still open (smaller, defer to implementation):
+- Exact multiplier arithmetic (how many tiers each multiplier moves).
+- Whether cross-skill pairing applies to every hazard uniformly or only the
+  data/action ones.
