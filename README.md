@@ -114,6 +114,30 @@ reads the cited evidence, follows the flow, and **confirms / dismisses / gates**
 The ledger owns termination; the model never self-terminates or invents findings.
 See [LOOP.md](./LOOP.md).
 
+## Enable it in pi or opencode
+
+The CLI is standalone. To run the triage loop inside your agent, install the package
+and point the harness at the shipped extension.
+
+**pi** — add an extension that re-exports it:
+
+```sh
+mkdir -p ~/.pi/agent/extensions/agent-riskmap && cd ~/.pi/agent/extensions/agent-riskmap
+npm init -y >/dev/null && npm install @stonefish-labs/agent-riskmap
+printf 'export { default } from "@stonefish-labs/agent-riskmap/extensions/pi";\n' > index.ts
+```
+
+Restart pi, then run `/agent-riskmap scan <dir>`.
+
+**opencode** — install the package where opencode resolves modules (e.g. `~/.config/opencode`), then add the plugin to `~/.config/opencode/opencode.json`:
+
+```json
+{ "plugin": ["@stonefish-labs/agent-riskmap/extensions/opencode"] }
+```
+
+Then ask it to "scan `<dir>` with agent-riskmap." Both register an `agent_riskmap_scan`
+tool and a `ledger` tool and drive the loop; full details in [extensions/](./extensions/README.md).
+
 ## MCP servers you cannot read
 
 Skills, hooks, and prompts you can read. A remote MCP server you often cannot. Point

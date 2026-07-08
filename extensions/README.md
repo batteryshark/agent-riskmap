@@ -21,10 +21,9 @@ Both extensions import the triage core from the package itself
 ## Pi
 
 ```sh
-mkdir -p ~/.pi/agent/extensions/agent-riskmap
-cp extensions/pi/index.ts ~/.pi/agent/extensions/agent-riskmap/index.ts
-cp extensions/pi/package.json ~/.pi/agent/extensions/agent-riskmap/package.json
-cd ~/.pi/agent/extensions/agent-riskmap && npm install   # pulls @stonefish-labs/agent-riskmap
+mkdir -p ~/.pi/agent/extensions/agent-riskmap && cd ~/.pi/agent/extensions/agent-riskmap
+npm init -y >/dev/null && npm install @stonefish-labs/agent-riskmap
+printf 'export { default } from "@stonefish-labs/agent-riskmap/extensions/pi";\n' > index.ts
 ```
 
 Pi discovers it on next start. Then:
@@ -43,7 +42,7 @@ Install `@stonefish-labs/agent-riskmap` where opencode can resolve it, then add 
 `~/.config/opencode/opencode.json`:
 
 ```json
-{ "plugin": ["@stonefish-labs/agent-riskmap/extensions/opencode/index.ts"] }
+{ "plugin": ["@stonefish-labs/agent-riskmap/extensions/opencode"] }
 ```
 
 Then ask the agent to *"scan `<dir>` with agent-riskmap"* (or call the
