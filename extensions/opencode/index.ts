@@ -67,9 +67,14 @@ export default async function AgentRiskmapPlugin(ctx: any) {
   return {
     config: async (input: any) => {
       input.command = input.command ?? {};
+      // opencode commands require a `template` (the prompt the slash command sends).
       input.command["agent-riskmap"] = {
         description: "Scan an agent surface and triage its hazardous capability combinations",
-        args: [{ name: "dir", description: "Path to the agent surface to scan", required: true }],
+        template:
+          'Use the agent_riskmap tool (action "scan", dir "$ARGUMENTS") to scan the agent surface, ' +
+          "then triage every seeded finding with the ledger tool " +
+          "(next → start → read the cited evidence → resolve/accept/block) " +
+          "until the ledger reports all items terminal.",
       };
     },
 
