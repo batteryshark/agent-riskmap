@@ -63,14 +63,14 @@ function recommend(hazards: HazardResult[], kindOf: Map<string, TargetKind>): Ag
       recs.push({
         action: auto ? "prune" : "restrict",
         text: auto
-          ? `${h.id}: hook "${t}" ${h.label} and runs automatically — prune or pin it.`
-          : `${h.id}: "${t}" can ${h.label} alone — sandbox or gate behind HITL before enabling.`,
+          ? `${h.id}: hook "${t}" is self-sufficient (${h.label}) and runs automatically — prune or pin it.`
+          : `${h.id}: "${t}" is self-sufficient for this hazard (${h.label}) — sandbox or gate behind HITL before enabling.`,
       });
     }
     if (h.crossPairs > 0) {
       recs.push({
         action: "gate",
-        text: `${h.id}: co-enabling any of [${h.aOnly.join(", ")}] (${h.aName}) with any of [${h.bOnly.join(", ")}] (${h.bName}) ${h.label} — keep them in separate agents or require review.`,
+        text: `${h.id}: co-enabling any of [${h.aOnly.join(", ")}] (${h.aName}) with any of [${h.bOnly.join(", ")}] (${h.bName}) enables this hazard (${h.label}) — keep them in separate agents or require review.`,
       });
     }
   }

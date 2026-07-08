@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agent-riskmap &middot; examples/sample-agent</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         margin: 0; color: #1f2328; background: #f6f8fa; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px 80px; }
+  header { padding: 34px 0 18px; border-bottom: 1px solid #d0d7de; }
+  header h1 { margin: 0 0 4px; font-size: 25px; font-weight: 750; letter-spacing: -.01em; }
+  header .q { color: #57606a; font-size: 15px; max-width: 720px; }
+  header .dir { color: #8c959f; font-size: 12.5px; margin-top: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .posture { display: inline-block; margin-top: 13px; padding: 5px 13px; border-radius: 999px; color: #fff;
+             font-weight: 700; font-size: 12.5px; letter-spacing: .03em; background: #b91c1c; }
+  .banner { margin-top: 14px; padding: 9px 13px; border-radius: 7px; font-size: 13px; background: #fff8e6; border: 1px solid #f0d985; color: #6b4e00; }
+  .banner.ok { background: #eafaf0; border-color: #9fe3c0; color: #0a6b3b; }
+  .stats { display: flex; flex-wrap: wrap; gap: 26px; margin: 20px 0 4px; }
+  .stat .n { font-size: 24px; font-weight: 750; line-height: 1; }
+  .stat .l { color: #57606a; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; margin-top: 3px; }
+  .muted { color: #6e7781; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+  h2 { font-size: 16px; margin: 38px 0 4px; font-weight: 700; }
+  h2 .sub { font-weight: 400; color: #6e7781; font-size: 13px; }
+  .card { background: #fff; border: 1px solid #d0d7de; border-left: 4px solid #d0d7de; border-radius: 8px; padding: 14px 16px; margin: 12px 0; }
+  .card.tier-critical { border-left-color: #b91c1c; }
+  .card.tier-elevated { border-left-color: #b45309; }
+  .card-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 9px; }
+  .tname { font-weight: 650; font-size: 14.5px; }
+  .kbadge { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #8c959f;
+            border: 1px solid #d0d7de; border-radius: 4px; padding: 0 5px; }
+  .tier-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+  .tier-badge { color: #fff; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+                padding: 1px 7px; border-radius: 999px; margin-left: auto; }
+  .tier-badge.sm { margin-left: 6px; font-size: 9.5px; }
+  .lbl { color: #57606a; font-weight: 650; font-size: 12px; }
+  .desc { font-size: 13.5px; margin: 3px 0; color: #24292f; }
+  .caps { margin: 6px 0; }
+  .cap { display: inline-block; background: #eaeef2; color: #24292f; padding: 1px 8px; border-radius: 5px;
+         margin: 2px 3px 2px 0; font-size: 12.5px; }
+  .cap.u { background: #fff1d6; color: #7a5200; }
+  .undisclosed { margin: 7px 0; padding: 7px 10px; background: #fff8e6; border: 1px solid #f0d985; border-radius: 6px; }
+  .warn { color: #9a6700; font-weight: 650; font-size: 12.5px; }
+  .risk { margin: 8px 0; }
+  .risk ul { margin: 4px 0 0; padding-left: 18px; }
+  .risk li { font-size: 13px; margin: 3px 0; color: #24292f; }
+  .do { margin: 9px 0 2px; font-size: 13.5px; }
+  .act { font-weight: 700; }
+  .act.a-red { color: #b91c1c; }
+  .act.a-amber { color: #b45309; }
+  .act.a-blue { color: #1d4ed8; }
+  .verdict { margin: 8px 0; padding: 8px 10px; border-radius: 6px; font-size: 12.5px; background: #f6f8fa; border: 1px solid #d0d7de; }
+  .vtag { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+          background: #d0d7de; color: #24292f; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
+  .v-confirmed, .v-gated { background: #eafaf0; border-color: #9fe3c0; }
+  .v-confirmed .vtag, .v-gated .vtag { background: #9fe3c0; color: #0a6b3b; }
+  .v-dismissed { background: #f6f8fa; }
+  .v-dismissed .vtag { background: #d0d7de; }
+  .v-needs-human, .v-blocked { background: #ffeaea; border-color: #f3b6b6; }
+  .v-needs-human .vtag, .v-blocked .vtag { background: #f3b6b6; color: #b91c1c; }
+  details.ev, details summary { cursor: pointer; }
+  details.ev > summary { font-size: 12px; color: #57606a; margin-top: 6px; }
+  .evtbl { width: 100%; border-collapse: collapse; margin-top: 7px; border: 1px solid #eaeef2; border-radius: 6px; overflow: hidden; }
+  .evtbl th, .evtbl td { text-align: left; padding: 6px 9px; border-bottom: 1px solid #eaeef2; font-size: 12px; vertical-align: top; }
+  .evtbl th { background: #f6f8fa; font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: #57606a; }
+  .evtbl tr:last-child td { border-bottom: none; }
+  .src { font-size: 9.5px; font-weight: 700; padding: 0 4px; border-radius: 3px; text-transform: uppercase; }
+  .src-atom { background: #d1fADF; color: #0a7c42; }
+  .src-pattern { background: #eaeef2; color: #57606a; }
+  table.all-skills { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #d0d7de; border-radius: 8px; overflow: hidden; }
+  table.all-skills td { padding: 0; }
+  .skill-row { border-bottom: 1px solid #eaeef2; }
+  .skill-row:last-child { border-bottom: none; }
+  table.all-skills details summary { list-style: none; padding: 8px 13px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  table.all-skills details summary::-webkit-details-marker { display: none; }
+  table.all-skills details[open] summary { background: #f6f8fa; border-bottom: 1px solid #eaeef2; }
+  .lr-desc { color: #57606a; font-size: 12.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .detail { padding: 11px 15px; }
+  .hz-list { margin-top: 8px; }
+  .hz-blk { background: #fff; border: 1px solid #d0d7de; border-radius: 8px; padding: 12px 15px; margin: 10px 0; }
+  .hz-h { font-size: 13px; margin-bottom: 6px; }
+  .hid { font-family: ui-monospace, monospace; font-weight: 700; color: #b91c1c; letter-spacing: .03em; }
+  .hz-blk details { margin: 4px 0; }
+  .hz-blk summary { cursor: pointer; font-size: 12.5px; color: #57606a; font-weight: 600; }
+  .hz-blk ul { margin: 5px 0 8px; padding-left: 18px; }
+  .hz-blk li { font-size: 12px; }
+  .pair { margin-top: 6px; }
+  .role { font-size: 11px; color: #57606a; font-weight: 650; text-transform: uppercase; letter-spacing: .03em; }
+  footer { margin-top: 46px; padding-top: 15px; border-top: 1px solid #d0d7de; color: #8c959f; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>agent-riskmap</h1>
+    <div class="q">What can each of these skills be tricked into, and what does my agent become once it holds them?</div>
+    <div class="dir">scanned: examples/sample-agent</div>
+    <div class="posture">posture: critical</div>
+    <div class="banner">Draft report from the deterministic scan only. This is a pessimistic prior, not a verdict — run the triage loop for a reviewed picture.</div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="n">10</div><div class="l">skills</div></div>
+    <div class="stat"><div class="n">5</div><div class="l">need attention</div></div>
+    <div class="stat"><div class="n">4</div><div class="l">self-sufficient</div></div>
+    <div class="stat"><div class="n">2</div><div class="l">steerable</div></div>
+    <div class="stat"><div class="n">2</div><div class="l">no signal</div></div>
+  </div>
+  <p class="muted" style="font-size:13px">8 skills &amp;middot; 1 mcp &amp;middot; 1 prompts. 4 skills can complete a hazard alone; 12 co-enable pairings.</p>
+
+  <h2>Skills that need your attention <span class="sub">(5)</span></h2>
+  <div class="card tier-critical">
+      <div class="card-top">
+        <span class="tier-dot" style="background:#b91c1c"></span>
+        <span class="tname mono">code-delegator</span>
+        <span class="kbadge">skill</span>
+        <span class="tier-badge" style="background:#b91c1c">critical</span>
+      </div>
+      <div class="desc"><span class="lbl">Says it:</span> Delegate a coding task to a local coding agent.</div><div class="undisclosed">
+         <span class="warn">⚠ May do more than its label suggests:</span>
+         <span class="cap u">bypass permission or safety prompts</span>
+       </div><div class="caps"><span class="lbl">Can actually:</span> <span class="cap">run code or hand off to another agent</span><span class="cap">bypass permission or safety prompts</span></div><div class="risk"><span class="lbl">Risk if abused:</span><ul><li>It can run code or delegate to another agent while bypassing safety, so it can act with no one watching.</li><li>It also bypasses permission or safety prompts, which makes any of the above worse.</li></ul></div>
+      <div class="do"><span class="lbl">What to do:</span> <span class="act a-red">turn off, or gate behind approval</span> — is self-sufficient for this hazard (runs code / delegates while bypassing safety) — sandbox or gate behind HITL before enabling.</div>
+      <details class="ev"><summary>evidence (4)</summary>
+         <table class="evtbl">
+           <thead><tr><th>capability</th><th>source</th><th>matched</th><th>where</th></tr></thead>
+           <tbody><tr>
+               <td>bypass permission or safety prompts</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">--dangerously-skip-permissions</td>
+               <td class="mono">code-delegator/SKILL.md:6</td>
+             </tr><tr>
+               <td>run code or hand off to another agent</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">Delegates coding</td>
+               <td class="mono">code-delegator/SKILL.md:5</td>
+             </tr><tr>
+               <td>run code or hand off to another agent</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">Claude Code</td>
+               <td class="mono">code-delegator/SKILL.md:5</td>
+             </tr><tr>
+               <td>run code or hand off to another agent</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">spawns subagent</td>
+               <td class="mono">code-delegator/SKILL.md:5</td>
+             </tr></tbody>
+         </table>
+       </details>
+    </div><div class="card tier-critical">
+      <div class="card-top">
+        <span class="tier-dot" style="background:#b91c1c"></span>
+        <span class="tname mono">watcher-daemon</span>
+        <span class="kbadge">skill</span>
+        <span class="tier-badge" style="background:#b91c1c">critical</span>
+      </div>
+      <div class="desc"><span class="lbl">Says it:</span> Watch a directory and run a build step when files change.</div><div class="caps"><span class="lbl">Can actually:</span> <span class="cap">run code or hand off to another agent</span><span class="cap">run unattended or survive across sessions</span></div><div class="risk"><span class="lbl">Risk if abused:</span><ul><li>It can run code and it runs unattended, so it keeps operating on its own across sessions.</li><li>It also runs unattended, across sessions, which makes any of the above worse.</li></ul></div>
+      <div class="do"><span class="lbl">What to do:</span> <span class="act a-red">turn off, or gate behind approval</span> — is self-sufficient for this hazard (standing autonomous capability that survives sessions) — sandbox or gate behind HITL before enabling.</div>
+      <details class="ev"><summary>evidence (4)</summary>
+         <table class="evtbl">
+           <thead><tr><th>capability</th><th>source</th><th>matched</th><th>where</th></tr></thead>
+           <tbody><tr>
+               <td>run code or hand off to another agent</td>
+               <td><span class="src src-atom">atom</span></td>
+               <td class="mono">execSync</td>
+               <td class="mono">watcher-daemon/run.js:2</td>
+             </tr><tr>
+               <td>run unattended or survive across sessions</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">daemon</td>
+               <td class="mono">watcher-daemon/SKILL.md:2</td>
+             </tr><tr>
+               <td>run unattended or survive across sessions</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">Installs a cron</td>
+               <td class="mono">watcher-daemon/SKILL.md:5</td>
+             </tr><tr>
+               <td>run unattended or survive across sessions</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">on startup</td>
+               <td class="mono">watcher-daemon/SKILL.md:5</td>
+             </tr></tbody>
+         </table>
+       </details>
+    </div><div class="card tier-elevated">
+      <div class="card-top">
+        <span class="tier-dot" style="background:#b45309"></span>
+        <span class="tname mono">.claude/commands</span>
+        <span class="kbadge">prompt</span>
+        <span class="tier-badge" style="background:#b45309">elevated</span>
+      </div>
+      <div class="desc"><span class="lbl">Says it:</span> <span class="muted">(no description declared)</span></div><div class="caps"><span class="lbl">Can actually:</span> <span class="cap">send or post things on your behalf (email, messages, PRs)</span><span class="cap">read sensitive data like passwords, keys, and tokens</span><span class="cap">read outside content that could carry hidden instructions</span></div><div class="risk"><span class="lbl">Risk if abused:</span><ul><li>It can send messages or posts on your behalf and it reads outside content, so a crafted message could make it send something you did not intend.</li><li>It also reads outside content that could contain hidden instructions, which makes any of the above worse.</li></ul></div>
+      <div class="do"><span class="lbl">What to do:</span> <span class="act a-amber">gate behind approval before enabling</span> — is self-sufficient for this hazard (sends something out you didn't intend) — sandbox or gate behind HITL before enabling.</div>
+      <details class="ev"><summary>evidence (3)</summary>
+         <table class="evtbl">
+           <thead><tr><th>capability</th><th>source</th><th>matched</th><th>where</th></tr></thead>
+           <tbody><tr>
+               <td>send or post things on your behalf (email, messages, PRs)</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">email them</td>
+               <td class="mono">.claude/commands/summarize.md:3</td>
+             </tr><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">credentials</td>
+               <td class="mono">.claude/commands/summarize.md:3</td>
+             </tr><tr>
+               <td>read outside content that could carry hidden instructions</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">Ignore all previous instructions</td>
+               <td class="mono">.claude/commands/summarize.md:3</td>
+             </tr></tbody>
+         </table>
+       </details>
+    </div><div class="card tier-elevated">
+      <div class="card-top">
+        <span class="tier-dot" style="background:#b45309"></span>
+        <span class="tname mono">credential-vault</span>
+        <span class="kbadge">skill</span>
+        <span class="tier-badge" style="background:#b45309">elevated</span>
+      </div>
+      <div class="desc"><span class="lbl">Says it:</span> Read cloud and Git credentials from the local machine for other tools to use.</div><div class="undisclosed">
+         <span class="warn">⚠ May do more than its label suggests:</span>
+         <span class="cap u">read sensitive data like passwords, keys, and tokens</span>
+       </div><div class="caps"><span class="lbl">Can actually:</span> <span class="cap">read sensitive data like passwords, keys, and tokens</span></div><div class="risk"><span class="lbl">Risk if abused:</span><ul><li>On its own it does not complete a full abuse path, but it is one half of one if paired with the wrong other skill (see the appendix).</li></ul></div>
+      <div class="do"><span class="lbl">What to do:</span> <span class="act a-amber">gate behind approval before enabling</span></div>
+      <details class="ev"><summary>evidence (8)</summary>
+         <table class="evtbl">
+           <thead><tr><th>capability</th><th>source</th><th>matched</th><th>where</th></tr></thead>
+           <tbody><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-atom">atom</span></td>
+               <td class="mono">/.aws/</td>
+               <td class="mono">credential-vault/SKILL.md:6</td>
+             </tr><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-atom">atom</span></td>
+               <td class="mono">.aws/credentials</td>
+               <td class="mono">credential-vault/SKILL.md:6</td>
+             </tr><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">credential</td>
+               <td class="mono">credential-vault/SKILL.md:2</td>
+             </tr><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">credentials</td>
+               <td class="mono">credential-vault/SKILL.md:3</td>
+             </tr><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">credentials</td>
+               <td class="mono">credential-vault/SKILL.md:5</td>
+             </tr><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">.env</td>
+               <td class="mono">credential-vault/read.js:2</td>
+             </tr><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">.aws</td>
+               <td class="mono">credential-vault/read.js:2</td>
+             </tr><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">credentials</td>
+               <td class="mono">credential-vault/read.js:2</td>
+             </tr></tbody>
+         </table>
+       </details>
+    </div><div class="card tier-elevated">
+      <div class="card-top">
+        <span class="tier-dot" style="background:#b45309"></span>
+        <span class="tname mono">inbox-assistant</span>
+        <span class="kbadge">skill</span>
+        <span class="tier-badge" style="background:#b45309">elevated</span>
+      </div>
+      <div class="desc"><span class="lbl">Says it:</span> Read your inbox and send email replies for you.</div><div class="caps"><span class="lbl">Can actually:</span> <span class="cap">send or post things on your behalf (email, messages, PRs)</span><span class="cap">read sensitive data like passwords, keys, and tokens</span><span class="cap">read outside content that could carry hidden instructions</span></div><div class="risk"><span class="lbl">Risk if abused:</span><ul><li>It can send messages or posts on your behalf and it reads outside content, so a crafted message could make it send something you did not intend.</li><li>It also reads outside content that could contain hidden instructions, which makes any of the above worse.</li></ul></div>
+      <div class="do"><span class="lbl">What to do:</span> <span class="act a-amber">gate behind approval before enabling</span> — is self-sufficient for this hazard (sends something out you didn't intend) — sandbox or gate behind HITL before enabling.</div>
+      <details class="ev"><summary>evidence (5)</summary>
+         <table class="evtbl">
+           <thead><tr><th>capability</th><th>source</th><th>matched</th><th>where</th></tr></thead>
+           <tbody><tr>
+               <td>send or post things on your behalf (email, messages, PRs)</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">send email</td>
+               <td class="mono">inbox-assistant/SKILL.md:3</td>
+             </tr><tr>
+               <td>send or post things on your behalf (email, messages, PRs)</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">sends an email</td>
+               <td class="mono">inbox-assistant/SKILL.md:5</td>
+             </tr><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">your inbox</td>
+               <td class="mono">inbox-assistant/SKILL.md:3</td>
+             </tr><tr>
+               <td>read sensitive data like passwords, keys, and tokens</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">your inbox</td>
+               <td class="mono">inbox-assistant/SKILL.md:5</td>
+             </tr><tr>
+               <td>read outside content that could carry hidden instructions</td>
+               <td><span class="src src-pattern">pattern</span></td>
+               <td class="mono">reads untrusted</td>
+               <td class="mono">inbox-assistant/SKILL.md:6</td>
+             </tr></tbody>
+         </table>
+       </details>
+    </div>
+
+  <h2>Lower-risk skills <span class="sub">(5)</span></h2>
+  <table class="all-skills"><tbody><tr class="skill-row"><td>
+      <details>
+        <summary>
+          <span class="tier-dot" style="background:#1d4ed8"></span>
+          <span class="mono tname">note-sync</span>
+          <span class="tier-badge sm" style="background:#1d4ed8">moderate</span>
+          <span class="lr-desc">Keep your notes tidy on your local disk. <span class="warn" title="send data off your machine">⚠ undisclosed</span></span>
+        </summary>
+        <div class="detail">
+          <div class="caps"><span class="cap">send data off your machine</span></div>
+          <table class="evtbl"><thead><tr><th>capability</th><th>source</th><th>matched</th><th>where</th></tr></thead>
+            <tbody><tr><td>send data off your machine</td><td><span class="src src-atom">atom</span></td><td class="mono">fetch</td><td class="mono">note-sync/sync.js:2</td></tr></tbody></table>
+        </div>
+      </details>
+    </td></tr><tr class="skill-row"><td>
+      <details>
+        <summary>
+          <span class="tier-dot" style="background:#1d4ed8"></span>
+          <span class="mono tname">repo-janitor</span>
+          <span class="tier-badge sm" style="background:#1d4ed8">moderate</span>
+          <span class="lr-desc">Clean up stale branches based on pull request activity.</span>
+        </summary>
+        <div class="detail">
+          <div class="caps"><span class="cap">delete or overwrite things</span></div>
+          <table class="evtbl"><thead><tr><th>capability</th><th>source</th><th>matched</th><th>where</th></tr></thead>
+            <tbody><tr><td>delete or overwrite things</td><td><span class="src src-pattern">pattern</span></td><td class="mono">deletes the</td><td class="mono">repo-janitor/SKILL.md:5</td></tr><tr><td>delete or overwrite things</td><td><span class="src src-pattern">pattern</span></td><td class="mono">force-push</td><td class="mono">repo-janitor/SKILL.md:6</td></tr></tbody></table>
+        </div>
+      </details>
+    </td></tr><tr class="skill-row"><td>
+      <details>
+        <summary>
+          <span class="tier-dot" style="background:#1d4ed8"></span>
+          <span class="mono tname">report-uploader</span>
+          <span class="tier-badge sm" style="background:#1d4ed8">moderate</span>
+          <span class="lr-desc">Upload a report payload to the reporting endpoint.</span>
+        </summary>
+        <div class="detail">
+          <div class="caps"><span class="cap">send data off your machine</span></div>
+          <table class="evtbl"><thead><tr><th>capability</th><th>source</th><th>matched</th><th>where</th></tr></thead>
+            <tbody><tr><td>send data off your machine</td><td><span class="src src-atom">atom</span></td><td class="mono">fetch</td><td class="mono">report-uploader/upload.js:2</td></tr><tr><td>send data off your machine</td><td><span class="src src-pattern">pattern</span></td><td class="mono">Uploads the given</td><td class="mono">report-uploader/SKILL.md:5</td></tr></tbody></table>
+        </div>
+      </details>
+    </td></tr><tr class="skill-row"><td>
+      <details>
+        <summary>
+          <span class="tier-dot" style="background:#4b5563"></span>
+          <span class="mono tname">.mcp.json›mcp:docs-search</span>
+          <span class="tier-badge sm" style="background:#4b5563">minimal</span>
+          <span class="lr-desc"><span class="muted">(no description)</span></span>
+        </summary>
+        <div class="detail">
+          <div class="caps"><span class="muted">no notable capability</span></div>
+          
+        </div>
+      </details>
+    </td></tr><tr class="skill-row"><td>
+      <details>
+        <summary>
+          <span class="tier-dot" style="background:#4b5563"></span>
+          <span class="mono tname">text-formatter</span>
+          <span class="tier-badge sm" style="background:#4b5563">minimal</span>
+          <span class="lr-desc">Normalize whitespace and capitalization in a string.</span>
+        </summary>
+        <div class="detail">
+          <div class="caps"><span class="muted">no notable capability</span></div>
+          
+        </div>
+      </details>
+    </td></tr></tbody></table>
+
+  <h2>Appendix: how skills can combine <span class="sub">(only matters when co-enabled)</span></h2>
+  <p class="muted">These only matter when two skills run in the same agent. A skill in one column plus a skill in the other, together, complete an abuse path that neither does alone.</p>
+    <div class="hz-list"><div class="hz-blk">
+        <div class="hz-h"><span class="hid">EXFIL</span> It can read sensitive data and send it off your machine, so if it is abused your secrets can leave the building.</div>
+        <details><summary>two-skill pairings (6)</summary>
+           <div class="pair"><span class="role">reads sensitive data</span><ul><li class="mono">.claude/commands</li><li class="mono">credential-vault</li><li class="mono">inbox-assistant</li></ul></div>
+           <div class="pair"><span class="role">can send off-host</span><ul><li class="mono">note-sync</li><li class="mono">report-uploader</li></ul></div></details>
+      </div><div class="hz-blk">
+        <div class="hz-h"><span class="hid">COMMS</span> It can send messages or posts on your behalf and it reads outside content, so a crafted message could make it send something you did not intend.</div>
+        <details><summary>self-sufficient on its own (2)</summary>
+           <ul><li class="mono">.claude/commands</li><li class="mono">inbox-assistant</li></ul></details>
+      </div><div class="hz-blk">
+        <div class="hz-h"><span class="hid">DESTROY</span> It can delete or overwrite things and it reads outside content, so a crafted message could make it destroy something you did not intend.</div>
+        <details><summary>two-skill pairings (2)</summary>
+           <div class="pair"><span class="role">destructive authority</span><ul><li class="mono">repo-janitor</li></ul></div>
+           <div class="pair"><span class="role">reads untrusted input</span><ul><li class="mono">.claude/commands</li><li class="mono">inbox-assistant</li></ul></div></details>
+      </div><div class="hz-blk">
+        <div class="hz-h"><span class="hid">GUARDRAIL</span> It can run code or delegate to another agent while bypassing safety, so it can act with no one watching.</div>
+        <details><summary>self-sufficient on its own (1)</summary>
+           <ul><li class="mono">code-delegator</li></ul></details>
+      </div><div class="hz-blk">
+        <div class="hz-h"><span class="hid">RCE</span> It reads outside content and can run code, so untrusted input could drive code execution.</div>
+        <details><summary>two-skill pairings (4)</summary>
+           <div class="pair"><span class="role">reads untrusted input</span><ul><li class="mono">.claude/commands</li><li class="mono">inbox-assistant</li></ul></div>
+           <div class="pair"><span class="role">runs code</span><ul><li class="mono">code-delegator</li><li class="mono">watcher-daemon</li></ul></div></details>
+      </div><div class="hz-blk">
+        <div class="hz-h"><span class="hid">PERSIST</span> It can run code and it runs unattended, so it keeps operating on its own across sessions.</div>
+        <details><summary>self-sufficient on its own (1)</summary>
+           <ul><li class="mono">watcher-daemon</li></ul></details>
+      </div></div>
+
+  <footer>Generated by agent-riskmap on 2026-07-08 19:35:41 UTC. The scan is a pessimistic prior, not a confirmed exploit; treat findings as &ldquo;review or gate,&rdquo; not &ldquo;malicious.&rdquo;</footer>
+</div>
+</body>
+</html>

@@ -32,7 +32,7 @@ export const HAZARDS: HazardDef[] = [
   },
   {
     id: "COMMS",
-    label: "sends something out you didn't intend (on untrusted input)",
+    label: "sends something out you didn't intend",
     aName: "outbound authority",
     bName: "reads untrusted input",
     a: (p) => hasFacet(p, "authority:outbound"),
@@ -40,7 +40,7 @@ export const HAZARDS: HazardDef[] = [
   },
   {
     id: "DESTROY",
-    label: "destroys something you didn't intend (on untrusted input)",
+    label: "destroys something you didn't intend",
     aName: "destructive authority",
     bName: "reads untrusted input",
     a: (p) => hasFacet(p, "authority:destructive"),

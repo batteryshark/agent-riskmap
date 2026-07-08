@@ -1,0 +1,1 @@
+{ "mcpServers": { "docs-search": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-everything"] } } }

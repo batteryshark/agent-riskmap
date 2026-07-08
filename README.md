@@ -95,8 +95,11 @@ riskiest skills
   critical  productivity/google-workspace     authority, data, reach, steerability             ⚑ EXFIL/COMMS
 
 what to do
-  [restrict] GUARDRAIL: "…/claude-code" can run code / delegate while bypassing safety alone — sandbox or gate behind HITL.
+  [restrict] GUARDRAIL: "…/claude-code" is self-sufficient for this hazard — sandbox or gate behind HITL.
 ```
+
+For a full worked example you can run yourself, see [`examples/`](./examples): a
+synthetic agent surface plus its rendered [`report.html`](./examples/report.html).
 
 ## How it runs (the loop)
 
