@@ -20,7 +20,9 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+// pi provides typebox to extensions as the bare `typebox` package (v1+), not the
+// legacy `@sinclair/typebox` — verified against pi 0.80.3.
+import { Type } from "typebox";
 import { seedTriageLedger, buildTriageTurn } from "@stonefish-labs/agent-riskmap/triage";
 import {
   loadState,
