@@ -1,6 +1,9 @@
-# @stonefish-labs/agent-riskmap
-
-**Point it at an agent surface. Map what your tools could be tricked into.**
+<div align="center">
+  <img src="assets/logo.png" alt="agent-riskmap" width="128" height="128">
+  <h1>agent-riskmap</h1>
+  <p><code>@stonefish-labs/agent-riskmap</code></p>
+  <p><em>Point it at an agent surface. Map what your tools could be tricked into.</em></p>
+</div>
 
 Agents accrete power one skill at a time. Each tool looks reasonable on its own,
 but a credential reader plus a network sender is an exfiltration path, and nobody
