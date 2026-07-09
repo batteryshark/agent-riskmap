@@ -10,7 +10,14 @@
  */
 
 import { workflow, type AgentRiskReport, type TargetReport } from "./product.js";
+import type { Tier } from "./severity.js";
 import { initLedger, addItem, loadState, getNextActionable, type LedgerState } from "./ledger.js";
+
+const TIER_SEVERITY: Record<Tier, number> = { critical: 3, elevated: 2, moderate: 1, minimal: 0 };
+/** The more severe of two tiers (used to floor a needs-human verdict at "elevated"). */
+function atLeast(t: Tier, floor: Tier): Tier {
+  return TIER_SEVERITY[t] >= TIER_SEVERITY[floor] ? t : floor;
+}
 
 const TIER_RANK: Record<string, number> = { critical: 4, elevated: 3, moderate: 2, minimal: 1 };
 
@@ -33,7 +40,19 @@ export function mergeVerdicts(report: AgentRiskReport, state: LedgerState): Agen
   const targets = report.targets.map((t) => {
     const item = byTarget.get(t.target);
     if (!item || !item.result) return t;
-    return { ...t, verdict: { status: item.status, label: item.state_label, result: item.result } };
+    const verdict = { status: item.status, label: item.state_label, result: item.result };
+    const label = item.state_label;
+    // The model's judgment moves the skill between report sections:
+    if (item.status === "accepted" || label === "dismissed") {
+      // over-stated / benign → out of the red sections into lower-risk, and no longer a "surprise".
+      return { ...t, verdict, tier: "moderate" as Tier, surprise: false };
+    }
+    if (item.status === "blocked" || label === "needs-human") {
+      // needs a human decision → keep it prominent (at least "gate"), narrative explains what's needed.
+      return { ...t, verdict, tier: atLeast(t.tier, "elevated") };
+    }
+    // resolved / confirmed / gated → keep the deterministic placement; the model's narrative leads.
+    return { ...t, verdict };
   });
   return { ...report, targets };
 }

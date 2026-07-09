@@ -29,13 +29,13 @@ test("html report is skill-centric: shows claimed purpose, plain capabilities, a
     const report = workflow(root);
     const html = renderHtml(report, root);
 
-    assert.match(html, /Skills that need your attention/);
+    assert.match(html, /Needs attention/); // scan-only draft leads by tier
     assert.match(html, /Says it:/);
     assert.match(html, /Delegate coding to Claude Code\./);
     assert.match(html, /Can actually:/);
-    assert.match(html, /What to do:/);
-    assert.match(html, /Risk if abused:/);
-    assert.match(html, /Appendix: how skills can combine/);
+    assert.match(html, /Do:/);
+    assert.match(html, /Turn off/);
+    assert.match(html, /How skills combine/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -51,7 +51,7 @@ test("a skill whose label hides capability is flagged as undisclosed", () => {
     assert.ok(t.undisclosed.length >= 1, "reads secrets / egress beyond the label");
     assert.ok(t.undisclosed.some((u) => /sensitive data/.test(u)));
     const html = renderHtml(report, root);
-    assert.match(html, /May do more than its label suggests/);
+    assert.match(html, /Does more than its label says|Not mentioned in its description/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -87,8 +87,8 @@ test("mergeVerdicts folds a triage result onto the matching skill", () => {
     assert.equal(t.verdict!.label, "confirmed");
     assert.match(t.verdict!.result, /WHAT IT DOES:/);
     const html = renderHtml(merged, root);
-    assert.match(html, /Reviewed report/);
-    assert.match(html, /LABEL MATCH/);
+    assert.match(html, /Reviewed:/);
+    assert.match(html, /Label match:/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

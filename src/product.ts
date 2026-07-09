@@ -15,7 +15,7 @@ import {
 } from "./dimensions.js";
 import { analyzeHazards, selfSufficientHazards, type HazardResult, type HazardId } from "./hazards.js";
 import { tierOfProfile, surfacePosture, type Posture, type Tier } from "./severity.js";
-import { descriptionGap } from "./plain.js";
+import { descriptionGap, hasUndisclosedPower, HAZARD_TITLE } from "./plain.js";
 
 export const PRODUCT = "agent-riskmap";
 export const QUESTION =
@@ -31,6 +31,7 @@ export interface TargetReport {
   tier: Tier;
   multipliers: Dimension[]; // which fired (guardrail / steerability / persistence)
   undisclosed: string[]; // detected capability (plain English) the declared description doesn't account for
+  surprise: boolean; // holds POWER the label doesn't disclose — drives the "does more than it says" section
   hints: DimHint[]; // capped, for triage evidence
   verdict?: { status: string; label: string | null; result: string }; // triage, when a ledger is merged
 }
@@ -58,23 +59,24 @@ const KINDS: TargetKind[] = ["skill", "mcp", "tool", "hooks", "prompt"];
 function recommend(hazards: HazardResult[], kindOf: Map<string, TargetKind>): AgentRiskReport["recommendations"] {
   const recs: AgentRiskReport["recommendations"] = [];
   for (const h of hazards) {
+    const risk = HAZARD_TITLE[h.id]; // "Could run code with safety turned off"
     for (const t of h.selfSufficient) {
       const auto = kindOf.get(t) === "hooks";
       recs.push({
         action: auto ? "prune" : "restrict",
         text: auto
-          ? `${h.id}: hook "${t}" is self-sufficient (${h.label}) and runs automatically — prune or pin it.`
-          : `${h.id}: "${t}" is self-sufficient for this hazard (${h.label}) — sandbox or gate behind HITL before enabling.`,
+          ? `Prune the "${t}" hook — ${risk} (${h.id}), and it runs automatically with no prompt. Pin or remove it.`
+          : `Gate "${t}" — ${risk} (${h.id}), and it can do this alone. Sandbox it, or require approval before enabling.`,
       });
     }
     if (h.crossPairs > 0) {
       recs.push({
         action: "gate",
-        text: `${h.id}: co-enabling any of [${h.aOnly.join(", ")}] (${h.aName}) with any of [${h.bOnly.join(", ")}] (${h.bName}) enables this hazard (${h.label}) — keep them in separate agents or require review.`,
+        text: `Keep apart — [${h.aOnly.join(", ")}] plus [${h.bOnly.join(", ")}] together: ${HAZARD_TITLE[h.id]} (${h.id}). Run them in separate agents, or require review.`,
       });
     }
   }
-  if (recs.length === 0) recs.push({ action: "ok", text: "No hazard composition found; no gating required beyond baseline review." });
+  if (recs.length === 0) recs.push({ action: "ok", text: "No hazardous capability combinations found — nothing to gate beyond normal review." });
   return recs;
 }
 
@@ -128,7 +130,8 @@ export function assembleReport(profiles: DimensionProfile[]): AgentRiskReport {
     },
     recommendations: recommend(hazards, kindOf),
     targets: profiles.map((p) => {
-      const posture = tierOfProfile(p);
+      const surprise = hasUndisclosedPower(p, p.description);
+      const posture = tierOfProfile(p, { undisclosedPower: surprise });
       return {
         target: p.target,
         kind: p.kind,
@@ -139,6 +142,7 @@ export function assembleReport(profiles: DimensionProfile[]): AgentRiskReport {
         tier: posture.tier,
         multipliers: posture.multipliers,
         undisclosed: descriptionGap(p, p.description),
+        surprise,
         hints: p.hints.slice(0, 12),
       };
     }),

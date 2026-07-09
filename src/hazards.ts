@@ -35,7 +35,7 @@ export const HAZARDS: HazardDef[] = [
     label: "sends something out you didn't intend",
     aName: "outbound authority",
     bName: "reads untrusted input",
-    a: (p) => hasFacet(p, "authority:outbound"),
+    a: (p) => hasFacet(p, "authority:outbound") || hasFacet(p, "authority:broadcast"),
     b: (p) => has(p, "steerability"),
   },
   {

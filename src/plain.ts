@@ -23,7 +23,8 @@ export const DIM_PLAIN: Record<Dimension, string> = {
 };
 
 export const FACET_PLAIN: Record<Facet, string> = {
-  "authority:outbound": "send or post things on your behalf (email, messages, PRs)",
+  "authority:outbound": "send or post things on your behalf (email, PRs, comments)",
+  "authority:broadcast": "message people directly — text, iMessage, or SMS to anyone",
   "authority:destructive": "delete or overwrite things",
   "reach:egress": "send data off your machine",
   "data:sensitive": "read sensitive data like passwords, keys, and tokens",
@@ -34,14 +35,24 @@ export const FACET_PLAIN: Record<Facet, string> = {
   "trust:elicitation": "pop prompts to your user through your agent",
 };
 
-/** A plain abuse sentence for a self-sufficient hazard. */
+/** A plain, one-sentence abuse description for a self-sufficient hazard. */
 export const HAZARD_PLAIN: Record<HazardId, string> = {
-  EXFIL: "It can read sensitive data and send it off your machine, so if it is abused your secrets can leave the building.",
-  COMMS: "It can send messages or posts on your behalf and it reads outside content, so a crafted message could make it send something you did not intend.",
-  DESTROY: "It can delete or overwrite things and it reads outside content, so a crafted message could make it destroy something you did not intend.",
-  GUARDRAIL: "It can run code or delegate to another agent while bypassing safety, so it can act with no one watching.",
-  RCE: "It reads outside content and can run code, so untrusted input could drive code execution.",
-  PERSIST: "It can run code and it runs unattended, so it keeps operating on its own across sessions.",
+  EXFIL: "It can read secrets and it can send data off your machine — misused, your secrets could leave.",
+  COMMS: "It can send things out and it reads untrusted content — a crafted message could make it send something you didn't intend.",
+  DESTROY: "It can delete or overwrite and it reads untrusted content — a crafted message could make it destroy something you didn't intend.",
+  GUARDRAIL: "It runs code (or hands off to another agent) with safety prompts bypassed — it can act with nobody watching.",
+  RCE: "It reads untrusted content and it can run code — that input could end up running as code.",
+  PERSIST: "It runs code and it keeps running unattended — a one-time risk becomes a standing one.",
+};
+
+/** Plain, headline-style titles for a hazard (shared by the HTML appendix and the CLI). */
+export const HAZARD_TITLE: Record<HazardId, string> = {
+  EXFIL: "Secrets could leave your machine",
+  COMMS: "Could be tricked into sending something out",
+  DESTROY: "Could be tricked into deleting something",
+  GUARDRAIL: "Could run code with safety turned off",
+  RCE: "Untrusted input could end up running as code",
+  PERSIST: "Could keep running unattended",
 };
 
 export const MULTIPLIER_PLAIN: Record<"guardrail" | "steerability" | "persistence" | "delegated-trust", string> = {
@@ -57,9 +68,10 @@ export const MULTIPLIER_PLAIN: Record<"guardrail" | "steerability" | "persistenc
  * undisclosed relative to its label.
  */
 const DESC_HINTS: Array<{ cap: Facet | Dimension; words: RegExp }> = [
-  { cap: "authority:outbound", words: /\b(send|sends|sending|sent|email|mail|post|posts|posting|publish|share|shares|tweet|message|notify|notification|dm|sms|reply|comment|pr\b|pull request|push)\b/i },
+  { cap: "authority:outbound", words: /\b(send|sends|sending|sent|email|mail|post|posts|posting|publish|share|shares|tweet|reply|comment|pr\b|pull request|push|notify|notification)\b/i },
+  { cap: "authority:broadcast", words: /\b(message|messages|messaging|imessage|imessages|sms|text|texts|texting|dm|dms|whatsapp|telegram|signal|chat|chats|contacts?)\b/i },
   { cap: "authority:destructive", words: /\b(delete|deletes|remove|removes|drop|drops|overwrite|overwrites|revoke|wipe|truncate|destroy|purge|clean|force.?push)\b/i },
-  { cap: "data:sensitive", words: /\b(credential|secret|secrets|key|keys|token|tokens|password|oauth|aws|ssh|\.env\b|keychain|private|inbox|mailbox|calendar|contacts?|cookie|api key|api_key)\b/i },
+  { cap: "data:sensitive", words: /\b(credentials?|secrets?|keys?|tokens?|passwords?|oauth|aws|ssh|\.env\b|keychain|private|inbox|mailbox|calendar|contacts?|cookies?|api[_\s-]?keys?)\b/i },
   { cap: "reach:egress", words: /\b(network|http|https|curl|fetch|upload|uploads|webhook|post|posts|request|requests|api|server|servers|remote|url|endpoint|egress|sync|syncs)\b/i },
   { cap: "latent", words: /\b(code|codes|coding|exec|execute|run|runs|running|shell|bash|subprocess|process|spawn|spawns|delegate|delegates|agent|agents|install|installs|build|builds|compile|script|scripts|claude|codex|sandbox|docker)\b/i },
   { cap: "guardrail", words: /\b(permission|permissions|sudo|bypass|bypasses|auto-?accept|auto-?approve|dangerously|yolo|skip|skips|sandbox|guardrail)\b/i },
@@ -67,16 +79,23 @@ const DESC_HINTS: Array<{ cap: Facet | Dimension; words: RegExp }> = [
   { cap: "steerability", words: /\b(fetch|fetches|scrape|scrapes|crawl|crawls|parse|parses|read|reads|ingest|ingests|web|webs|url|urls|email|emails|inbox|rss|feed|feeds|untrusted|external|remote|download|downloads)\b/i },
 ];
 
+// Power capabilities (the ones that carry blast radius). Steerability/persistence are
+// multipliers, not power — an undisclosed multiplier alone isn't the "surprise" that
+// escalates a skill; undisclosed *power* is.
+const POWER_CAPS: ReadonlySet<Facet | Dimension> = new Set<Facet | Dimension>([
+  "data:sensitive", "reach:egress", "latent", "authority", "authority:outbound", "authority:broadcast", "authority:destructive", "guardrail",
+]);
+
 /**
- * Detected capabilities the declared description does not account for, as plain
- * English. Facets win over their bare dimension (more specific), so a dimension
- * only surfaces when it has no facet form detected. A capability counts as
- * "undisclosed" when it is detected but none of its hint words appear in the label.
+ * Detected capabilities the declared description does not account for, as structured
+ * caps (facet or bare dimension). Facets win over their bare dimension (more specific),
+ * so a dimension only surfaces when it has no facet form detected. A capability counts
+ * as "undisclosed" when it is detected but none of its hint words appear in the label.
  */
-export function descriptionGap(p: DimensionProfile, description?: string): string[] {
+export function descriptionGapCaps(p: DimensionProfile, description?: string): Array<Facet | Dimension> {
   if (!description) return [];
   const desc = description.toLowerCase();
-  const out: string[] = [];
+  const out: Array<Facet | Dimension> = [];
   const coveredDims = new Set<Dimension>();
 
   const facetEntries = DESC_HINTS.filter((e) => e.cap.includes(":"));
@@ -84,20 +103,49 @@ export function descriptionGap(p: DimensionProfile, description?: string): strin
 
   for (const { cap, words } of facetEntries) {
     const dim = cap.split(":")[0] as Dimension;
-    const detected = p.facets.has(cap as Facet);
-    if (!detected) continue;
+    if (!p.facets.has(cap as Facet)) continue;
     if (words.test(desc)) {
       coveredDims.add(dim); // the label accounts for this, so don't double-report the dim
       continue;
     }
-    out.push(FACET_PLAIN[cap as Facet]);
+    out.push(cap as Facet);
     coveredDims.add(dim);
   }
   for (const { cap, words } of dimEntries) {
     const dim = cap as Dimension;
     if (coveredDims.has(dim) || !p.dims.has(dim)) continue;
-    if (!words.test(desc)) out.push(DIM_PLAIN[dim]);
+    if (!words.test(desc)) out.push(dim);
   }
   return out;
+}
+
+/** The description gap as plain-English capability phrases. */
+export function descriptionGap(p: DimensionProfile, description?: string): string[] {
+  return descriptionGapCaps(p, description).map((c) =>
+    typeof c === "string" && c.includes(":") ? FACET_PLAIN[c as Facet] : DIM_PLAIN[c as Dimension],
+  );
+}
+
+/**
+ * Does the skill hold POWER its label doesn't disclose, on STRONG evidence? This is the
+ * "surprise" signal — the thing that makes a skill lead the report.
+ *
+ * A terse description ("Debug Python", "Search GIFs") names almost none of a skill's
+ * capability, so "not in the label" alone flags nearly every capable skill — that just
+ * relabels the noise. To be a real surprise, the undisclosed capability must be
+ * DEMONSTRATED, not merely a prose mention: a code atom / live-observed MCP tool, or a
+ * guardrail bypass (whose pattern — `--dangerously-skip-permissions` &c. — is itself
+ * high-signal). Subtler, purpose-incongruent surprises are the triage loop's job to find.
+ */
+export function hasUndisclosedPower(p: DimensionProfile, description?: string): boolean {
+  const strongDims = new Set(p.hints.filter((h) => h.source === "atom" || h.source === "mcp").map((h) => h.dimension));
+  const demonstrated = (c: Facet | Dimension): boolean => {
+    const dim = (typeof c === "string" && c.includes(":") ? c.split(":")[0] : c) as Dimension;
+    return dim === "guardrail" || strongDims.has(dim);
+  };
+  if (!description) {
+    return [...p.facets].some((f) => POWER_CAPS.has(f) && demonstrated(f)) || [...p.dims].some((d) => POWER_CAPS.has(d) && demonstrated(d));
+  }
+  return descriptionGapCaps(p, description).some((c) => POWER_CAPS.has(c) && demonstrated(c));
 }
 
