@@ -19,7 +19,7 @@ import { descriptionGap, hasUndisclosedPower, HAZARD_TITLE } from "./plain.js";
 
 export const PRODUCT = "agent-riskmap";
 export const QUESTION =
-  "What can each of these skills be tricked into, and what does my agent become once it holds them?";
+  "What each skill can do, what it does that its description doesn't mention, and what to do about it.";
 
 export interface TargetReport {
   target: string;

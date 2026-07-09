@@ -428,7 +428,7 @@ export function renderHtml(report: AgentRiskReport, dir: string): string {
 <div class="wrap">
   <header>
     <h1>${esc(report.product)}</h1>
-    <div class="q">What each skill can do, what it does that its description doesn't mention, and what to do about it.</div>
+    <div class="q">${esc(report.question)}</div>
     <div class="dir">scanned: ${esc(dir)}</div>
     <div class="posture">${esc(POSTURE_PLAIN[p.tier])}</div>
     ${banner}
