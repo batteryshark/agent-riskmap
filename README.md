@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.png" alt="agent-riskmap" width="128" height="128">
+  <img src="assets/logo-480.png" alt="Agent Riskmap robot navigator discovering a hazard where capability routes converge" width="480">
   <h1>agent-riskmap</h1>
   <p><code>@stonefish-labs/agent-riskmap</code></p>
   <p><em>Point it at an agent surface. Map what your tools could be tricked into.</em></p>
