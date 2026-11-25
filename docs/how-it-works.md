@@ -45,7 +45,7 @@ shell command heads: `subprocess.run` → `EXEC.PROC`, `fetch` → `NETW.HTTP`,
 `fs.readFileSync('~/.aws/credentials')` → `CRED.*`) and *instruction patterns*,
 high-precision phrases matched over the prose (`--dangerously-skip-permissions`,
 "delegate to Claude Code", "your inbox"). Both roll up to the **seven risk
-dimensions** (see [RISK-TAXONOMY.md](./docs/RISK-TAXONOMY.md)): Action Authority ·
+dimensions** (see [RISK-TAXONOMY.md](./RISK-TAXONOMY.md)): Action Authority ·
 Data Access · Latent Capability · Guardrail Posture · Steerability · Reach ·
 Persistence.
 
@@ -80,7 +80,7 @@ model reviews every skill; the deterministic pass never has the last word.
 ## 4. Triage: is each finding real, and what do we do?
 
 A ledger-driven ralph loop, shipped as the pi and opencode extensions under
-[`extensions/`](./extensions/README.md): the `agent_riskmap_scan` tool seeds the
+[`extensions/`](../extensions/README.md): the `agent_riskmap_scan` tool seeds the
 ledger from the deterministic scan, the `ledger` tool adjudicates, and `resume()`
 drives the turns. For each `review` item the harness model:
 

@@ -112,7 +112,7 @@ extensions** ([`extensions/`](./extensions/README.md)) add the triage loop: the 
 scan seeds a ledger, then your harness model adjudicates each finding item by item,
 reads the cited evidence, follows the flow, and **confirms / dismisses / gates** it.
 The ledger owns termination; the model never self-terminates or invents findings.
-See [LOOP.md](./LOOP.md).
+See [docs/how-it-works.md](./docs/how-it-works.md).
 
 ## Enable it in pi or opencode
 
@@ -169,6 +169,6 @@ install it if you want the `mcp` command (the static scan needs nothing).
   finds *reachable capability*, not a proven exploit, so treat findings as
   "gate/review," not "confirmed malicious."
 - Generic prompt-injection phrase detection is not in yet, so prompt targets rarely
-  raise *steerability* on their own. See the note in [LOOP.md](./LOOP.md).
+  raise *steerability* on their own. See the note in [docs/how-it-works.md](./docs/how-it-works.md).
 
-Apache-2.0
+MIT. See [LICENSE](./LICENSE).
